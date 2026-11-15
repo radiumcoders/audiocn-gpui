@@ -32,7 +32,7 @@
 mod shell;
 pub mod source;
 
-pub use shell::Playground;
+pub use shell::{Playground, site_theme};
 
 use std::collections::HashMap;
 

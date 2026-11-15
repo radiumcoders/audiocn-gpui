@@ -9,7 +9,7 @@ defaults, visuals and keyboard behaviour. The React source is the spec; differen
 can't express are listed in each module's docs.
 
 ```sh
-cargo add audiocn --git https://github.com/radiumcoders/audiocn-gpui
+cargo add audiocn
 ```
 
 ```rust
@@ -31,6 +31,10 @@ div()
 ```
 
 Call `audiocn::init(cx)` once at startup (it registers the text-input key bindings).
+
+The docs are on [audiocn.dev/docs/gpui](https://audiocn.dev/docs/gpui): every page of the React docs, for
+GPUI, with live examples (the gallery below, compiled to WebAssembly). The React | GPUI switch at
+the top of the docs sidebar moves between the two.
 
 ## What's in it
 
@@ -100,6 +104,10 @@ It also builds for the browser (GPUI's web platform):
 scripts/build-wasm.sh                     # → target/web (needs wasm-bindgen-cli 0.2.129)
 python3 -m http.server -d target/web      # open /?demo=knob&variant=metal&theme=dark
 ```
+
+`&preset=ocean` applies one of audiocn.dev's colour themes. The docs site builds this bundle into
+`public/gpui` (`pnpm gpui:build`, also run by `pnpm build`) and embeds one example per iframe; an
+embedded example posts its height to the page.
 
 ## Develop
 

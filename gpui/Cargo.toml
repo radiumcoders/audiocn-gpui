@@ -6,7 +6,7 @@ members = ["crates/audiocn", "crates/gallery"]
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/radiumcoders/audiocn-gpui"
-homepage = "https://audiocn.dev"
+homepage = "https://audiocn.dev/docs/gpui"
 
 [workspace.dependencies]
 gpui = { package = "gpui-pre", version = "0.3.9" }
