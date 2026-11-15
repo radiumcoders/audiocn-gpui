@@ -430,8 +430,9 @@ impl RenderOnce for SoundPadGrid {
                 }
                 let keystroke = &event.keystroke;
                 let modifiers = keystroke.modifiers;
+                // Global hotkeys inside the grid land here too: the window-wide
+                // listener leaves them to the grid, which also sees key-ups and repeats.
                 let hotkey_pressed = hotkeys
-                    && scope == HotkeyScope::Focus
                     && !modifiers.platform
                     && !modifiers.control
                     && !modifiers.alt
@@ -469,7 +470,7 @@ impl RenderOnce for SoundPadGrid {
                 }
             })
             .on_key_up(move |event: &KeyUpEvent, window, cx| {
-                if scope == HotkeyScope::Focus || global {
+                if hotkeys {
                     handle_up(&up_pads, &up_held, &event.keystroke.key, window, cx);
                 }
             });
@@ -805,6 +806,8 @@ impl RenderOnce for SoundPad {
             .flex_col()
             .min_h(px(min_h))
             .role(gpui::Role::Button)
+            // aria-keyshortcuts={hotkey}
+            .when_some(self.hotkey.clone(), |el, key| el.aria_keyshortcuts(key))
             .when(
                 matches!(mode, SoundPadMode::Toggle | SoundPadMode::Loop),
                 |el| {

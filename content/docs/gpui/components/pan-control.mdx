@@ -8,7 +8,7 @@ seoDescription: A pan control for GPUI apps in Rust, with left and right balance
 
 ## Installation
 
-```bash
+```cargo
 cargo add audiocn
 ```
 
@@ -39,7 +39,7 @@ For a rotary pan, use a [Knob](/docs/gpui/components/knob) with `.min(-1.)`, `.m
 
 ## Accessibility
 
-The thumb is focusable and takes arrow keys (Shift for `large_step`), Page Up, Page Down, Home and End; the knob example supports the same keys. Neither reports a role or value to assistive technology yet, so the React `aria-valuetext` has no equivalent. `describe_pan` still returns the same text, such as "30% left" or "Center", for your own announcements, while `format_pan` keeps the visible value short.
+The thumb is focusable and takes arrow keys (Shift for `large_step`), Page Up, Page Down, Home and End; the knob example supports the same keys. The thumb has the slider role and the name "Pan", and reads its value with `describe_pan`, such as "30% left" or "Center", while `format_pan` keeps the visible value short. The knob example uses the knob's own slider role.
 
 ## API reference
 

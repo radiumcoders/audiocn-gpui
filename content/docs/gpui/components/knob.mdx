@@ -8,7 +8,7 @@ seoDescription: A rotary control for GPUI apps in Rust, with drag, keyboard inpu
 
 ## Installation
 
-```bash
+```cargo
 cargo add audiocn
 ```
 
@@ -144,7 +144,7 @@ The knob paints with the active `audiocn::Theme`. The React CSS variables are bu
 
 ## Accessibility
 
-The dial is focusable and takes the same keys as the [fader](/docs/gpui/components/fader#keyboard): arrows step by `step`, Shift+arrow, Page Up and Page Down by `large_step`, Alt+arrow by `fine_step`, Home and End jump to the ends, and Enter opens the value editor. The knob does not report a role, name or value to assistive technology yet, so the React ARIA attributes have no equivalent.
+The dial is focusable and takes the same keys as the [fader](/docs/gpui/components/fader#keyboard): arrows step by `step`, Shift+arrow, Page Up and Page Down by `large_step`, Alt+arrow by `fine_step`, Home and End jump to the ends, and Enter opens the value editor. The dial has the slider role, with its range and its value as `format` writes it. `KnobLabel` names it; without one, name it with `.aria_label(..)`.
 
 ## API reference
 
@@ -231,6 +231,12 @@ The dial is focusable and takes the same keys as the [fader](/docs/gpui/componen
       "Overrides the dial size from size.",
     ],
     ["disabled", "bool", "false", null],
+    [
+      "aria_label",
+      "impl Into<SharedString>",
+      "the KnobLabel text",
+      "Names the dial for assistive technology.",
+    ],
     [
       "config",
       "AudioConfig",
