@@ -7,6 +7,9 @@ import {
 } from "@/lib/docs/registry";
 import { siteConfig } from "@/lib/site";
 
+const GPUI_INTRO =
+  "This is audiocn for GPUI, Zed's Rust UI framework: the same components as the React registry, in the `audiocn` crate (`cargo add audiocn`).";
+
 const LIBRARY_INTRO =
   "audiocn is a shadcn/ui registry of audio components for React: meters, visualizers, knobs, faders, players and mixers. The code is copied into the project and owned by it.";
 
@@ -382,9 +385,10 @@ export const buildPageMarkdown = ({
   pathname,
   body,
 }: PageMarkdownInput): string => {
+  const intro = pathname.startsWith("/docs/gpui") ? GPUI_INTRO : LIBRARY_INTRO;
   const sections = [
     `# ${title}`,
-    `> Source: ${absoluteUrl(pathname)}\n> ${LIBRARY_INTRO}`,
+    `> Source: ${absoluteUrl(pathname)}\n> ${intro}`,
   ];
   if (description) {
     sections.push(description);
@@ -392,6 +396,18 @@ export const buildPageMarkdown = ({
   sections.push(body);
   return `${collapse(sections.join("\n\n"))}\n`;
 };
+
+/** The short prompt for a GPUI page, handed to a chat URL. */
+export const buildGpuiCompactPrompt = ({
+  title,
+  pathname,
+}: Omit<CompactPromptInput, "name">): string =>
+  [
+    `Add the audiocn ${title} to my GPUI app in Rust.`,
+    `Read ${absoluteUrl(markdownUrlFor(pathname))} and follow its Installation and Usage sections exactly.`,
+    "Crate: https://crates.io/crates/audiocn.",
+    `Full index: ${absoluteUrl("/llms.txt")}.`,
+  ].join(" ");
 
 export interface CompactPromptInput {
   title: string;

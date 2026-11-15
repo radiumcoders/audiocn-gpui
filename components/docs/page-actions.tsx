@@ -2,6 +2,7 @@
 
 import {
   CaretDownIcon,
+  FileRsIcon,
   FileTsIcon,
   MarkdownLogoIcon,
   OpenAiLogoIcon,
@@ -83,12 +84,20 @@ export interface PageActionsProps {
   title: string;
   /** The Markdown twin of this page, such as `/docs/components/knob.md`. */
   markdownUrl: string;
-  /** The registry item JSON, such as `https://audiocn.dev/r/knob.json`. */
-  registryUrl: string;
-  /** The same item on this deployment, such as `/r/knob.json`. */
+  /** The registry item JSON, such as `https://audiocn.dev/r/knob.json`. Opens in v0. */
+  registryUrl?: string;
+  /**
+   * The same item on this deployment, such as `/r/knob.json`, or for Rust the
+   * module's raw source.
+   */
   sourceUrl: string;
-  /** The npx form of the install command, switched per package manager. */
+  /**
+   * The npx form of the install command, switched per package manager; for
+   * Rust, the cargo command as is.
+   */
   installCommand: string;
+  /** `rust` for the GPUI docs: plain source and a cargo command. */
+  language?: "tsx" | "rust";
   /** The short prompt handed to a chat URL, which cannot carry the page. */
   compactPrompt: string;
 }
@@ -105,7 +114,9 @@ export const PageActions = ({
   sourceUrl,
   installCommand,
   compactPrompt,
+  language = "tsx",
 }: PageActionsProps) => {
+  const rust = language === "rust";
   const [packageManager] = usePackageManager();
   const success = useRef("Copied");
   const { copy, state } = useCopyToClipboard({
@@ -133,8 +144,11 @@ export const PageActions = ({
   };
 
   const commands = convertNpmCommand(installCommand);
-  const command =
+  let command =
     packageManager === "prompt" ? commands.npm : commands[packageManager];
+  if (rust) {
+    command = installCommand;
+  }
 
   return (
     <div className="not-prose mb-6 flex items-center gap-1">
@@ -176,11 +190,11 @@ export const PageActions = ({
           <DropdownMenuItem
             onClick={() =>
               run("Component source copied", () =>
-                fetchRegistrySource(sourceUrl)
+                rust ? fetchText(sourceUrl) : fetchRegistrySource(sourceUrl)
               )
             }
           >
-            <FileTsIcon />
+            {rust ? <FileRsIcon /> : <FileTsIcon />}
             Copy component source
           </DropdownMenuItem>
           <DropdownMenuItem
@@ -228,21 +242,23 @@ export const PageActions = ({
             <AnthropicIcon />
             Open in Claude
           </DropdownMenuItem>
-          <DropdownMenuItem
-            render={
-              <a
-                aria-label="Open in v0"
-                href={chatUrl("https://v0.dev/chat/api/open", {
-                  url: registryUrl,
-                })}
-                rel="noreferrer"
-                target="_blank"
-              />
-            }
-          >
-            <VercelIcon />
-            Open in v0
-          </DropdownMenuItem>
+          {registryUrl && (
+            <DropdownMenuItem
+              render={
+                <a
+                  aria-label="Open in v0"
+                  href={chatUrl("https://v0.dev/chat/api/open", {
+                    url: registryUrl,
+                  })}
+                  rel="noreferrer"
+                  target="_blank"
+                />
+              }
+            >
+              <VercelIcon />
+              Open in v0
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

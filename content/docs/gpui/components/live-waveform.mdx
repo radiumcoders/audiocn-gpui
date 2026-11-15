@@ -8,7 +8,7 @@ seoDescription: A live waveform for GPUI apps in Rust that draws scrolling level
 
 ## Installation
 
-```bash
+```cargo
 cargo add audiocn
 ```
 
@@ -51,7 +51,7 @@ With `.active(false)` the waveform shows a dotted line.
 
 The browser preview has no microphone: "Use my microphone" switches the waveform to the demo speech signal instead. In a native app, enable the `device` feature and pass the visual source of `audiocn::io::use_microphone`. A longer history fills the width:
 
-```bash
+```cargo
 cargo add audiocn --features device
 ```
 

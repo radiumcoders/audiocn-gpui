@@ -8,7 +8,7 @@ seoDescription: A smooth waveform line for GPUI apps in Rust that follows live a
 
 ## Installation
 
-```bash
+```cargo
 cargo add audiocn
 ```
 
@@ -49,7 +49,7 @@ With no signal the line rests flat. `.loading(true)` runs a pulse along it, for 
 
 The browser preview has no microphone: "Use my microphone" plays the demo speech signal into the scope instead, and stopping it lets the line fall flat. In a native app, enable the `device` feature and pass the visual source of `audiocn::io::use_microphone`:
 
-```bash
+```cargo
 cargo add audiocn --features device
 ```
 

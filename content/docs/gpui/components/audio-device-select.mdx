@@ -8,13 +8,13 @@ seoDescription: A microphone, speaker or source picker for GPUI apps in Rust, wi
 
 ## Installation
 
-```bash
+```cargo
 cargo add audiocn
 ```
 
 The select itself needs no audio backend. To list the system's real devices with `audiocn::io::use_audio_devices`, enable the `device` feature:
 
-```bash
+```cargo
 cargo add audiocn --features device
 ```
 
