@@ -33,6 +33,7 @@ use gpui::{
     StyleRefinement, Styled, Window, canvas, div, linear_color_stop, linear_gradient, point, px,
     size,
 };
+use gpui::{InteractiveElement as _, StatefulInteractiveElement as _};
 
 use crate::audio::decibels::clamp;
 use crate::audio::electric::{
@@ -1191,7 +1192,14 @@ impl RenderOnce for ElectricWaveform {
             options.intensity
         };
 
-        let mut root = div().relative().w_full().h(px(96.0));
+        let mut root = div()
+            .id(self.id.clone())
+            // role="img" aria-label="..."
+            .role(gpui::Role::Image)
+            .aria_label(self.aria_label.clone())
+            .relative()
+            .w_full()
+            .h(px(96.0));
         root.style().refine(&self.style);
         root.child(
             canvas(

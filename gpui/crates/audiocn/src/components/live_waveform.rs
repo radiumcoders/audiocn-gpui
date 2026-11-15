@@ -13,6 +13,7 @@ use gpui::{
     PathBuilder, PathStyle, Pixels, Refineable, RenderOnce, StrokeOptions, StyleRefinement, Styled,
     Window, canvas, div, fill, linear_color_stop, linear_gradient, point, px, size,
 };
+use gpui::{InteractiveElement as _, SharedString, StatefulInteractiveElement as _};
 use parking_lot::Mutex;
 
 use crate::audio::bands::resample_levels;
@@ -796,6 +797,7 @@ struct LiveWaveformState {
 #[derive(IntoElement)]
 pub struct LiveWaveform {
     id: ElementId,
+    aria_label: SharedString,
     source: Option<FrameSource<VisualFrame>>,
     options: DrawOptions,
     actions: Option<LiveWaveformActions>,
@@ -806,11 +808,18 @@ impl LiveWaveform {
     pub fn new(id: impl Into<ElementId>) -> Self {
         Self {
             id: id.into(),
+            aria_label: "Live waveform".into(),
             source: None,
             options: DrawOptions::default(),
             actions: None,
             style: StyleRefinement::default(),
         }
+    }
+
+    /// Names the waveform for assistive technology (`aria-label`). Default "Live waveform".
+    pub fn aria_label(mut self, label: impl Into<SharedString>) -> Self {
+        self.aria_label = label.into();
+        self
     }
 
     pub fn source(mut self, source: FrameSource<VisualFrame>) -> Self {
@@ -934,7 +943,14 @@ impl RenderOnce for LiveWaveform {
         let watching = options.active && (self.source.is_some() || self.actions.is_some());
         let painter_state = state.clone();
 
-        let mut root = div().relative().h(px(64.0)).w_full();
+        let mut root = div()
+            .id(self.id.clone())
+            // role="img" aria-label="..."
+            .role(gpui::Role::Image)
+            .aria_label(self.aria_label.clone())
+            .relative()
+            .h(px(64.0))
+            .w_full();
         root.style().refine(&self.style);
         root.child(
             canvas(

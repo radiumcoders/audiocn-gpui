@@ -98,7 +98,7 @@ The visualizer paints with the active `audiocn::Theme`. The React CSS variables 
 
 ## Accessibility
 
-GPUI has no accessibility tree for this element yet. `.aria_label(..)` is accepted for parity with React, default "Audio visualizer", but is not exposed.
+The visualizer has the image role, named "Audio visualizer" by default; change it with `.aria_label(..)`.
 
 The flicker changes brightness by at most 12%, only on thin strokes, and each jagged shape holds for at least 40 ms, so nothing flashes across a large area. With reduced motion the bars are straight and still, with no arcs, sparks or flicker, and redraw four times a second. GPUI has no system query for it, so set it with `audiocn::signal::reduced_motion::set_reduced_motion(true, cx)`.
 
@@ -185,7 +185,7 @@ The flicker changes brightness by at most 12%, only on thin strokes, and each ja
       "aria_label",
       "impl Into<SharedString>",
       '"Audio visualizer"',
-      "Kept for parity; not exposed yet.",
+      "Names the image for assistive technology.",
     ],
   ]}
 />

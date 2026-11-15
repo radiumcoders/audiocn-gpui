@@ -105,6 +105,12 @@ The [System Audio Mixer](/docs/gpui/blocks/system-audio-mixer) block is a workin
   rows={[
     ["new", "(id: impl Into<ElementId>)", null, null],
     [
+      "aria_label",
+      "impl Into<SharedString>",
+      null,
+      "Names the mixer group, as React does with its MixerTitle. Pass the title text.",
+    ],
+    [
       "orientation",
       "Orientation",
       "Horizontal",

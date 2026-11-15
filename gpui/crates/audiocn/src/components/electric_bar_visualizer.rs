@@ -20,6 +20,7 @@ use gpui::{
     App, ContentMask, ElementId, Hsla, IntoElement, ParentElement, Pixels, Point, Refineable,
     RenderOnce, SharedString, StyleRefinement, Styled, Window, canvas, div, point, px,
 };
+use gpui::{InteractiveElement as _, StatefulInteractiveElement as _};
 
 use super::electric_waveform::{
     EdgeFade, GlowLayer, REDUCED_MOTION_INTERVAL_MS, StrokeStyle, fill_polygon, glow_box,
@@ -1194,7 +1195,12 @@ impl RenderOnce for ElectricBarVisualizer {
             orientation,
         };
 
-        let mut root = div().relative();
+        let mut root = div()
+            .id(self.id.clone())
+            // role="img" aria-label="..."
+            .role(gpui::Role::Image)
+            .aria_label(self.aria_label.clone())
+            .relative();
         root = if orientation == Orientation::Horizontal {
             root.h(px(64.0)).w_full()
         } else {

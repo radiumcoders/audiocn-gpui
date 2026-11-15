@@ -106,6 +106,7 @@ pub struct Mixer {
     zones: Option<Vec<MeterZone>>,
     ballistics: Option<BallisticsInput>,
     disabled: bool,
+    aria_label: Option<SharedString>,
     children: Vec<MixerChild>,
     style: StyleRefinement,
 }
@@ -121,9 +122,18 @@ impl Mixer {
             zones: None,
             ballistics: None,
             disabled: false,
+            aria_label: None,
             children: Vec::new(),
             style: StyleRefinement::default(),
         }
+    }
+
+    /// Names the mixer's group for assistive technology. React names it with
+    /// its `MixerTitle` (`aria-labelledby`); GPUI can't read the title from
+    /// the header, so pass the same text here.
+    pub fn aria_label(mut self, label: impl Into<SharedString>) -> Self {
+        self.aria_label = Some(label.into());
+        self
     }
 
     /// `horizontal` stacks row strips; `vertical` lays console strips side by
@@ -308,7 +318,13 @@ impl gpui::RenderOnce for Mixer {
                         .child(cell(areas.master).h_full()),
                 ),
         };
-        let mut root = layout.id(self.id).min_w_0().children(areas.other);
+        let mut root = layout
+            .id(self.id)
+            // role="group", named like the title.
+            .role(gpui::Role::Group)
+            .when_some(self.aria_label, |el, label| el.aria_label(label))
+            .min_w_0()
+            .children(areas.other);
         root.style().refine(&self.style);
         provide(context, provide(config, root))
     }

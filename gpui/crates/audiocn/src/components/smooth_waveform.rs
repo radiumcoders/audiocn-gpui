@@ -4,6 +4,7 @@ use gpui::{
     App, ElementId, IntoElement, ParentElement, Refineable, RenderOnce, StyleRefinement, Styled,
     Window, canvas, div, px,
 };
+use gpui::{InteractiveElement as _, SharedString, StatefulInteractiveElement as _};
 
 use super::live_waveform::{
     ActionOp, ActionQueue, CanvasLineStyle, CanvasShape, SourceCursor, paint_canvas_shapes,
@@ -153,6 +154,7 @@ struct SmoothWaveformState {
 #[derive(IntoElement)]
 pub struct SmoothWaveform {
     id: ElementId,
+    aria_label: SharedString,
     source: Option<FrameSource<VisualFrame>>,
     mode: SmoothWaveformMode,
     loading: bool,
@@ -167,6 +169,7 @@ impl SmoothWaveform {
     pub fn new(id: impl Into<ElementId>) -> Self {
         Self {
             id: id.into(),
+            aria_label: "Audio waveform".into(),
             source: None,
             mode: SmoothWaveformMode::Wave,
             loading: false,
@@ -176,6 +179,12 @@ impl SmoothWaveform {
             actions: None,
             style: StyleRefinement::default(),
         }
+    }
+
+    /// Names the waveform for assistive technology (`aria-label`). Default "Audio waveform".
+    pub fn aria_label(mut self, label: impl Into<SharedString>) -> Self {
+        self.aria_label = label.into();
+        self
     }
 
     pub fn source(mut self, source: FrameSource<VisualFrame>) -> Self {
@@ -264,7 +273,14 @@ impl RenderOnce for SmoothWaveform {
         let line_width = self.line_width;
         let fade = self.fade_edges.then_some(FADE_PX);
         let painter_state = state.clone();
-        let mut root = div().relative().h(px(96.0)).w_full();
+        let mut root = div()
+            .id(self.id.clone())
+            // role="img" aria-label="..."
+            .role(gpui::Role::Image)
+            .aria_label(self.aria_label.clone())
+            .relative()
+            .h(px(96.0))
+            .w_full();
         root.style().refine(&self.style);
         root.child(
             canvas(

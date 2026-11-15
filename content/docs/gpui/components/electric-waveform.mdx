@@ -92,7 +92,7 @@ The waveform paints with the active `audiocn::Theme`. The React CSS variables ar
 
 ## Accessibility
 
-GPUI has no accessibility tree for this element yet. `.aria_label(..)` is accepted for parity with React, default "Audio waveform", but is not exposed.
+The waveform has the image role, named "Audio waveform" by default; change it with `.aria_label(..)`.
 
 The flicker changes brightness by at most 12% and each jagged shape holds for at least 40 ms, so nothing flashes. With reduced motion the line is smooth and still, with no crackle, forks or sparks, and redraws four times a second. GPUI has no system query for it, so set it with `audiocn::signal::reduced_motion::set_reduced_motion(true, cx)`.
 
@@ -138,7 +138,7 @@ The flicker changes brightness by at most 12% and each jagged shape holds for at
       "aria_label",
       "impl Into<SharedString>",
       '"Audio waveform"',
-      "Kept for parity; not exposed yet.",
+      "Names the image for assistive technology.",
     ],
   ]}
 />

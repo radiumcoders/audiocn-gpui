@@ -1790,6 +1790,7 @@ impl RenderOnce for SystemAudioMixer {
         }
 
         let mut mixer = Mixer::new(root)
+            .aria_label("Audio mixer")
             .orientation(orientation)
             .child(
                 MixerHeader::new()
