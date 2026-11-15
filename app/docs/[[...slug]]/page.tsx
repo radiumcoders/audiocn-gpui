@@ -7,10 +7,14 @@ import {
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { GpuiPageActions } from "@/components/docs/gpui-page-actions";
 import { PageActions } from "@/components/docs/page-actions";
-import { buildCompactPrompt, markdownUrlFor } from "@/lib/docs/ai-prompt";
-import { frameworkOf, GPUI_BASE } from "@/lib/docs/framework";
+import {
+  buildCompactPrompt,
+  buildGpuiCompactPrompt,
+  markdownUrlFor,
+} from "@/lib/docs/ai-prompt";
+import { GPUI_BASE, frameworkOf, twinPath } from "@/lib/docs/framework";
+import { gpuiModulePath } from "@/lib/docs/gpui-source";
 import {
   registryItemForPath,
   registryItemPath,
@@ -21,21 +25,13 @@ import { getPageMetadata } from "@/lib/social-metadata";
 import { source } from "@/lib/source";
 import { getMDXComponents } from "@/mdx-components";
 
-const GPUI_SECTIONS = new Set(["components", "blocks"]);
-
-/** The Rust module behind a GPUI component or block page, on GitHub. */
-const gpuiSourceUrl = (pathname: string): string | undefined => {
-  const repo = `https://github.com/${siteConfig.githubRepo}`;
-  if (pathname === GPUI_BASE) {
-    return `${repo}/tree/main/gpui`;
-  }
-  const [section, slug, ...rest] = pathname
-    .slice(GPUI_BASE.length + 1)
-    .split("/");
-  if (!GPUI_SECTIONS.has(section) || !slug || rest.length > 0) {
-    return undefined;
-  }
-  return `${repo}/blob/main/gpui/crates/audiocn/src/${section}/${slug.replaceAll("-", "_")}.rs`;
+/** A GPUI page's Rust module, as raw text the "Copy component source" action can fetch. */
+const gpuiRawSourceUrl = (pathname: string): string | undefined => {
+  const file = gpuiModulePath(pathname);
+  return (
+    file &&
+    `https://raw.githubusercontent.com/${siteConfig.githubRepo}/main/${file}`
+  );
 };
 
 interface PageProps {
@@ -51,21 +47,31 @@ const Page = async ({ params }: PageProps) => {
   }
 
   const MdxContent = page.data.body;
-  const item = registryItemForPath(page.url);
   const gpui = frameworkOf(page.url) === "gpui";
+  // A GPUI page gets the same actions as its React twin, for the Rust crate.
+  const item = registryItemForPath(
+    gpui ? twinPath(page.url, "react") : page.url
+  );
+  const gpuiSource = gpui ? gpuiRawSourceUrl(page.url) : undefined;
 
   return (
     <DocsPage full={page.data.full} toc={page.data.toc}>
       <DocsTitle>{page.data.title}</DocsTitle>
       <DocsDescription>{page.data.description}</DocsDescription>
-      {gpui && (
-        <GpuiPageActions
+      {item && gpuiSource && (
+        <PageActions
+          compactPrompt={buildGpuiCompactPrompt({
+            pathname: page.url,
+            title: page.data.title,
+          })}
+          installCommand="cargo add audiocn"
+          language="rust"
           markdownUrl={markdownUrlFor(page.url)}
-          sourceUrl={gpuiSourceUrl(page.url)}
+          sourceUrl={gpuiSource}
           title={page.data.title}
         />
       )}
-      {item && (
+      {item && !gpui && (
         <PageActions
           compactPrompt={buildCompactPrompt({
             name: item.name,

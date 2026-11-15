@@ -85,3 +85,48 @@ export const readGpuiExample = async (
     : [base, `${base}${DEVICE}`];
   return extractFn(code, order[0]) ?? extractFn(code, order[1]) ?? code;
 };
+
+const CRATE_SRC = "gpui/crates/audiocn/src";
+
+/** GPUI equivalents of the React hooks, by docs slug. */
+const HOOK_MODULES: Record<string, string> = {
+  "use-audio-analyser": "io/analyser.rs",
+  "use-audio-context": "io/context.rs",
+  "use-audio-devices": "io/devices.rs",
+  "use-audio-player": "io/player.rs",
+  "use-clip-hold": "signal/clip_hold.rs",
+  "use-demo-signal": "signal/demo_signal.rs",
+  "use-frame-source": "audio/frame_source.rs",
+  "use-gain-node": "io/gain.rs",
+  "use-level": "signal/level.rs",
+  "use-microphone": "io/microphone.rs",
+  "use-mixer": "signal/mixer.rs",
+  "use-reduced-motion": "signal/reduced_motion.rs",
+  "use-sound": "io/sound.rs",
+  "use-system-audio": "io/system_audio.rs",
+  "use-tap-tempo": "signal/tap_tempo.rs",
+  "use-visibility": "audio/frame_loop.rs",
+  "use-waveform-data": "signal/waveform_data.rs",
+  "use-web-audio-mixer": "io/web_audio_mixer.rs",
+};
+
+/**
+ * The crate file a GPUI component, block or hook page documents, such as
+ * `gpui/crates/audiocn/src/components/knob.rs` for `/docs/gpui/components/knob`.
+ */
+export const gpuiModulePath = (pathname: string): string | undefined => {
+  const [section, slug, ...rest] = pathname
+    .replace(/^\/docs\/gpui\/?/u, "")
+    .split("/");
+  if (!slug || rest.length > 0) {
+    return undefined;
+  }
+  if (section === "hooks") {
+    const file = HOOK_MODULES[slug];
+    return file && `${CRATE_SRC}/${file}`;
+  }
+  if (section === "components" || section === "blocks") {
+    return `${CRATE_SRC}/${section}/${slug.replaceAll("-", "_")}.rs`;
+  }
+  return undefined;
+};

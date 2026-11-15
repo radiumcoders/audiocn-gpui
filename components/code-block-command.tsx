@@ -57,6 +57,12 @@ export interface CodeBlockCommandProps {
   bun?: string;
 
   /**
+   * A cargo command (the GPUI docs). Shown alone, in place of the package
+   * manager tabs.
+   */
+  cargo?: string;
+
+  /**
    * Callback invoked when a command is successfully copied to clipboard.
    *
    * Receives an object containing the selected package manager and the copied command text.
@@ -107,20 +113,26 @@ export function CodeBlockCommand({
   yarn,
   npm,
   bun,
+  cargo,
   onCopySuccess,
   onCopyError,
 }: CodeBlockCommandProps) {
-  const [packageManager, setPackageManager] = usePackageManager();
+  const [savedPackageManager, setPackageManager] = usePackageManager();
+  // A cargo command has one tab, whatever package manager was picked.
+  const packageManager = cargo ? "cargo" : savedPackageManager;
 
-  const tabs = useMemo(
-    () => ({
-      prompt,
-      pnpm,
-      yarn,
-      npm,
-      bun,
-    }),
-    [prompt, pnpm, yarn, npm, bun]
+  const tabs: Record<string, string | undefined> = useMemo(
+    () =>
+      cargo
+        ? { cargo }
+        : {
+            prompt,
+            pnpm,
+            yarn,
+            npm,
+            bun,
+          },
+    [prompt, pnpm, yarn, npm, bun, cargo]
   );
 
   const tabsFiltered = useMemo(
@@ -134,7 +146,9 @@ export function CodeBlockCommand({
         className="gap-0"
         value={packageManager}
         onValueChange={(value) => {
-          setPackageManager(value as PackageManager);
+          if (!cargo) {
+            setPackageManager(value as PackageManager);
+          }
         }}
       >
         <ScrollArea.Root className="shadow-border w-full pr-10 shadow-[inset_0_-1px_0_0]">
@@ -195,7 +209,7 @@ export function CodeBlockCommand({
         onCopySuccess={(copiedCommand) => {
           onCopySuccess?.({
             command: copiedCommand,
-            packageManager,
+            packageManager: savedPackageManager,
           });
         }}
         onCopyError={onCopyError}
@@ -204,7 +218,7 @@ export function CodeBlockCommand({
   );
 }
 
-function getIconForPackageManager(manager: PackageManager) {
+function getIconForPackageManager(manager: PackageManager | "cargo") {
   switch (manager) {
     case "prompt": {
       return <TextAlignLeftIcon />;

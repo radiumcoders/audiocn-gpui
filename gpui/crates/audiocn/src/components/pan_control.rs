@@ -410,7 +410,7 @@ impl PanControl {
     }
 
     /// The value's text for assistive technology. Default [`format_pan`].
-    /// (GPUI has no accessibility tree yet, so it is not shown.)
+    /// It's the thumb's accessibility description.
     pub fn format(mut self, format: impl Fn(f32) -> String + 'static) -> Self {
         self.format = Rc::new(format);
         self
@@ -574,8 +574,8 @@ impl RenderOnce for PanControl {
         if animating {
             window.request_animation_frame();
         }
-        // The value's text (`sr-only`); there is no accessibility tree to put it in.
-        let _value_text = (self.format)(value);
+        // React's sr-only `format(value)` becomes the thumb's description.
+        let value_text = (self.format)(value);
 
         let start = value.min(0.0);
         let end = value.max(0.0);
@@ -596,6 +596,14 @@ impl RenderOnce for PanControl {
 
         let thumb_el = div()
             .id("pan-control-thumb")
+            // Base UI's slider thumb: aria-label="Pan", getAriaValueText={describePan}.
+            .role(gpui::Role::Slider)
+            .aria_label("Pan")
+            .aria_min_numeric_value(-1.0)
+            .aria_max_numeric_value(1.0)
+            .aria_numeric_value(value as f64)
+            .aria_value(describe_pan(value))
+            .aria_description(value_text)
             .absolute()
             .top(px((track_size - thumb) / 2.0))
             .left(relative((value + 1.0) / 2.0))

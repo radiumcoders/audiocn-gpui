@@ -8,13 +8,13 @@ seoDescription: A sound trigger pad for GPUI apps in Rust, with one-shot, toggle
 
 ## Installation
 
-```bash
+```cargo
 cargo add audiocn
 ```
 
 To play the sounds natively with `audiocn::io::use_sound`, add the `device` feature:
 
-```bash
+```cargo
 cargo add audiocn --features device
 ```
 
@@ -87,7 +87,7 @@ The pad paints with the active `audiocn::Theme`, tinted with its accent. The Rea
 
 ## Accessibility
 
-A pad is focusable and has the button role. In toggle and loop modes it reports its pressed state. Enter and Space press it, and in hold mode they play until released. The grid moves focus between pads with the arrow keys. GPUI has no `aria-keyshortcuts`, so `SoundPadShortcut` is the only place the hotkey shows. Global hotkeys never fire while someone is typing in a field.
+A pad is focusable and has the button role. In toggle and loop modes it reports its pressed state. Enter and Space press it, and in hold mode they play until released. The grid moves focus between pads with the arrow keys. A pad's hotkey is its `aria_keyshortcuts`, and `SoundPadShortcut` shows it. Global hotkeys never fire while someone is typing in a field.
 
 ## API reference
 
@@ -135,7 +135,7 @@ A pad is focusable and has the button role. In toggle and loop modes it reports 
       "hotkey_scope",
       "HotkeyScope",
       "Focus",
-      "Global listens in the whole window. There a hotkey press is a tap, so hold pads stop at once.",
+      "Global listens in the whole window. Outside the grid a hotkey press is a tap, so hold pads stop at once; inside it, hold works as with Focus.",
     ],
     ["pad_min_width", "Pixels", "88px", null],
     ["pad_gap", "Pixels", "8px", null],

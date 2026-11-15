@@ -9,7 +9,10 @@ const tree = splitFrameworks(source.getPageTree());
 
 const Layout = ({ children }: { children: React.ReactNode }) => (
   <DocsLayout
-    sidebar={{ banner: <FrameworkSwitch urls={pageUrls(tree)} /> }}
+    sidebar={{
+      // Fumadocs renders the banner in a list of sidebar header items.
+      banner: <FrameworkSwitch key="framework" urls={pageUrls(tree)} />,
+    }}
     tabs={false}
     tree={tree}
     {...baseOptions({ docs: true })}

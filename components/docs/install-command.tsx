@@ -8,7 +8,10 @@ import { cn } from "@/lib/utils";
 
 interface InstallCommandProps {
   className?: string;
-  /** An npm or npx command, shown translated for each package manager. */
+  /**
+   * An npm or npx command, shown translated for each package manager, or a
+   * cargo command (the GPUI docs), shown as is.
+   */
   command: string;
 }
 
@@ -16,6 +19,10 @@ interface InstallCommandProps {
 export const InstallCommand = ({ className, command }: InstallCommandProps) => (
   // Prose styles would box the command's <code> like inline code.
   <div className={cn("not-prose", className)}>
-    <CodeBlockCommand {...convertNpmCommand(command)} />
+    {command.startsWith("cargo ") ? (
+      <CodeBlockCommand cargo={command} />
+    ) : (
+      <CodeBlockCommand {...convertNpmCommand(command)} />
+    )}
   </div>
 );

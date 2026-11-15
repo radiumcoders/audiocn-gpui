@@ -16,7 +16,7 @@ GPUI exposes an accessibility tree to screen readers through [AccessKit](https:/
 
 ## Controls
 
-`Fader`, `ParameterSlider`, `VolumeControl` and the player's seek bar have the slider role. The fader, parameter slider and volume control report a readable value, such as "−6.0 dB" or "Silent". `Knob`, `PanControl` and `Waveform` have no role yet, though they format the same values for their readouts ("30% left", "1:24"). They all share one keyboard map:
+`Fader`, `ParameterSlider`, `VolumeControl` and the player's seek bar have the slider role. The fader, parameter slider and volume control report a readable value, such as "−6.0 dB" or "Silent". `Knob` and `PanControl` have the slider role too, and read their values as "−6 dB" or "30% left". `Waveform` has no role yet, though it formats the same times for its readouts ("1:24"). They all share one keyboard map:
 
 | Key                                | Action            |
 | ---------------------------------- | ----------------- |

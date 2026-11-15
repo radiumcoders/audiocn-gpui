@@ -6,7 +6,7 @@ seoDescription: AudioOutput is audiocn's native AudioContext for GPUI, behind th
 
 Every `audiocn::io` type that makes sound plays through one shared output on the default device, the native counterpart of the browser's `AudioContext`. It opens the first time something plays. There is no autoplay policy natively, so nothing waits for a user gesture.
 
-```bash
+```cargo
 cargo add audiocn --features device
 ```
 

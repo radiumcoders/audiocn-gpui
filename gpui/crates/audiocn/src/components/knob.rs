@@ -45,8 +45,8 @@ use gpui::{
     FocusHandle, Font, FontWeight, Global, Hsla, InteractiveElement, IntoElement, KeyDownEvent,
     Keystroke, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement,
     PathBuilder, Pixels, Point, Refineable, RenderOnce, ScrollWheelEvent, SharedString,
-    StyleRefinement, Styled, Subscription, TextRun, Window, canvas, div, linear_color_stop,
-    linear_gradient, point, prelude::FluentBuilder, px,
+    StatefulInteractiveElement, StyleRefinement, Styled, Subscription, TextRun, Window, canvas,
+    div, linear_color_stop, linear_gradient, point, prelude::FluentBuilder, px,
 };
 
 use crate::audio::click::{ClickPlayOptions, ClickSound, ClickVoice, create_click_sound};
@@ -1107,6 +1107,7 @@ pub struct Knob {
     knob_size: Option<Pixels>,
     disabled: Option<bool>,
     config: AudioConfig,
+    aria_label: Option<SharedString>,
     children: Vec<KnobPart>,
     style: StyleRefinement,
 }
@@ -1139,9 +1140,17 @@ impl Knob {
             knob_size: None,
             disabled: None,
             config: AudioConfig::default(),
+            aria_label: None,
             children: Vec::new(),
             style: StyleRefinement::default(),
         }
+    }
+
+    /// Names the dial for assistive technology when there is no [`KnobLabel`]
+    /// (React's `aria-label`). A `KnobLabel` names it otherwise (`aria-labelledby`).
+    pub fn aria_label(mut self, label: impl Into<SharedString>) -> Self {
+        self.aria_label = Some(label.into());
+        self
     }
 
     /// Controlled value: changes are only reported through `on_value_change`.
@@ -1578,6 +1587,12 @@ impl RenderOnce for Knob {
             .unwrap_or_else(|| Rc::new(parse_knob_value));
 
         let mut children = self.children;
+        let label = self.aria_label.clone().or_else(|| {
+            children.iter().find_map(|part| match part {
+                KnobPart::Label(label) => Some(label.text.clone()),
+                _ => None,
+            })
+        });
         if children.is_empty() {
             children.push(KnobPart::Dial(
                 KnobDial::new()
@@ -1692,6 +1707,7 @@ impl RenderOnce for Knob {
             editing,
             draft,
             value_width,
+            label,
         });
 
         let mut root = div()
@@ -1728,6 +1744,8 @@ struct RenderCtx {
     draft: ValueDraft,
     /// Characters in the widest value, for a steady value label.
     value_width: usize,
+    /// The dial's accessible name: `aria_label`, or the `KnobLabel` text.
+    label: Option<SharedString>,
 }
 
 fn dial_pointer(position: Point<Pixels>, bounds: Bounds<Pixels>) -> DialPointer {
@@ -1780,8 +1798,18 @@ fn render_dial(
     let prepaint_cell = bounds_cell.clone();
     let drag_state = state.clone();
 
+    let settings = &ctx.shared.settings;
+    let value_text = (ctx.shared.format)(ctx.value);
     let el = div()
         .id("knob-dial")
+        // role="slider" with aria-valuemin/max/now/text, named by the label.
+        .role(gpui::Role::Slider)
+        .aria_min_numeric_value(settings.min as f64)
+        .aria_max_numeric_value(settings.max as f64)
+        .aria_numeric_value(ctx.value as f64)
+        .aria_numeric_value_step(settings.step as f64)
+        .aria_value(value_text)
+        .when_some(ctx.label.clone(), |el, label| el.aria_label(label))
         .relative()
         .flex_none()
         .size(ctx.knob_size)

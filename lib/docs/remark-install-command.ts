@@ -9,7 +9,7 @@ interface InstallCommandNode {
 }
 
 const isNpmCode = (node: RootContent): node is Code =>
-  node.type === "code" && node.lang === "npm";
+  node.type === "code" && (node.lang === "npm" || node.lang === "cargo");
 
 const toInstallCommand = (node: Code): InstallCommandNode => ({
   attributes: [
@@ -35,6 +35,7 @@ const replaceNpmCode = (parent: Parent) => {
 /**
  * Renders ```npm code blocks as `<InstallCommand />`, which shows the
  * command for every package manager. Replaces fumadocs' own `remarkNpm`.
+ * ```cargo blocks (the GPUI docs) get the same box with a single cargo tab.
  */
 export const remarkInstallCommand = () => (tree: Root) => {
   replaceNpmCode(tree);
