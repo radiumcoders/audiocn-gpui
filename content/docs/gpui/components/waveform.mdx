@@ -102,7 +102,7 @@ The waveform paints with the active `audiocn::Theme`. The React CSS variables ar
 
 When interactive, the waveform is focusable. Arrow keys seek by `step`, Shift by `large_step`, and Home and End jump to the ends. Region edges are separate focus stops: arrow keys move an edge by 0.1 s, or 1 s with Shift.
 
-GPUI has no accessibility tree for this element yet, so there is no slider role or value text such as "1:24 of 3:40". `.aria_label(..)` is accepted for parity but not exposed.
+When seeking is on, the waveform is a slider whose value reads like "1:24 of 3:40"; name it with `.aria_label(..)`. Region handles are sliders named "Region start" and "Region end".
 
 ## API reference
 
@@ -151,12 +151,7 @@ GPUI has no accessibility tree for this element yet, so there is no slider role 
       null,
       "See Theming.",
     ],
-    [
-      "aria_label",
-      "impl Into<SharedString>",
-      null,
-      "Kept for parity; not exposed yet.",
-    ],
+    ["aria_label", "impl Into<SharedString>", null, "Names the seek slider."],
     ["child / children", "Waveform parts or any element", null, null],
   ]}
 />

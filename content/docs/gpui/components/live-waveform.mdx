@@ -91,7 +91,7 @@ The gallery runs the real microphone with `cargo run -p audiocn-gallery --featur
 
 ## Accessibility
 
-GPUI has no accessibility tree for this element yet, and `LiveWaveform` has no `aria_label`. Label the meter or control next to it instead. With reduced motion it redraws four times a second. GPUI has no system query for it, so set it with `audiocn::signal::reduced_motion::set_reduced_motion(true, cx)`.
+The waveform has the image role, named "Live waveform" by default; change it with `.aria_label(..)`. With reduced motion it redraws four times a second. GPUI has no system query for it, so set it with `audiocn::signal::reduced_motion::set_reduced_motion(true, cx)`.
 
 ## API reference
 
@@ -102,6 +102,12 @@ GPUI has no accessibility tree for this element yet, and `LiveWaveform` has no `
       "(id: impl Into<ElementId>)",
       null,
       "Keeps the scroll and the last frame between renders.",
+    ],
+    [
+      "aria_label",
+      "impl Into<SharedString>",
+      '"Live waveform"',
+      "Names the image for assistive technology.",
     ],
     ["source", "FrameSource<VisualFrame>", null, null],
     [

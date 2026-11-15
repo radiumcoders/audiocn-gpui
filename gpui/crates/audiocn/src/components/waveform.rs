@@ -597,6 +597,24 @@ impl RenderOnce for WaveformRegion {
                         "end"
                     },
                 ))
+                // Sliders named "Region start" / "Region end", valued in seconds.
+                .role(gpui::Role::Slider)
+                .aria_label(if kind == RegionDragKind::Start {
+                    "Region start"
+                } else {
+                    "Region end"
+                })
+                .map(|el| {
+                    let (min, max, now) = if kind == RegionDragKind::Start {
+                        (0.0, end, start)
+                    } else {
+                        (start, duration, end)
+                    };
+                    el.aria_min_numeric_value(min.round())
+                        .aria_max_numeric_value(max.round())
+                        .aria_numeric_value(now.round())
+                        .aria_value(format_time(now, FormatTimeOptions::default()))
+                })
                 .absolute()
                 .top_0()
                 .bottom_0()
@@ -1111,7 +1129,7 @@ impl Waveform {
         self
     }
 
-    /// `aria-label` (kept for parity; GPUI has no accessibility tree yet).
+    /// Names the seek slider for assistive technology (`aria-label`).
     pub fn aria_label(mut self, label: impl Into<SharedString>) -> Self {
         self.aria_label = Some(label.into());
         self
@@ -1287,6 +1305,19 @@ impl RenderOnce for Waveform {
         if !active {
             return root;
         }
+        // role="slider" with aria-valuetext "1:24 of 3:40".
+        let time_text = |seconds: f64| format_time(seconds, FormatTimeOptions::default());
+        let root = root
+            .role(gpui::Role::Slider)
+            .aria_min_numeric_value(0.0)
+            .aria_max_numeric_value(duration.round())
+            .aria_numeric_value(latest_time.round())
+            .aria_value(format!(
+                "{} of {}",
+                time_text(latest_time),
+                time_text(duration)
+            ))
+            .when_some(self.aria_label.clone(), |el, label| el.aria_label(label));
 
         let step = self.step;
         let large_step = self.large_step;

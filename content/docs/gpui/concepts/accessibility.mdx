@@ -11,12 +11,12 @@ GPUI exposes an accessibility tree to screen readers through [AccessKit](https:/
 - `LevelMeter` has the meter role and reports its value in dB, such as "−12.0 dB", with its range. The value updates at most four times a second, so screen readers are not flooded.
 - Give every meter a name with `.aria_label(..)`.
 - `BarVisualizer`, `Spectrum` and the track list's playing indicator have the image role. Mark a decorative bar visualizer `.aria_hidden(true)` when a labelled meter sits next to it.
-- `ElectricWaveform`, `ElectricBarVisualizer` and `Waveform` take `.aria_label(..)` but don't expose it yet. `LiveWaveform` and `SmoothWaveform` have no role.
+- `ElectricWaveform`, `ElectricBarVisualizer`, `LiveWaveform` and `SmoothWaveform` have the image role with a default name; change it with `.aria_label(..)`.
 - `ClipIndicator` is a button that resets the clip. GPUI has no live regions, so it does not announce "Clipping".
 
 ## Controls
 
-`Fader`, `ParameterSlider`, `VolumeControl` and the player's seek bar have the slider role. The fader, parameter slider and volume control report a readable value, such as "−6.0 dB" or "Silent". `Knob` and `PanControl` have the slider role too, and read their values as "−6 dB" or "30% left". `Waveform` has no role yet, though it formats the same times for its readouts ("1:24"). They all share one keyboard map:
+`Fader`, `ParameterSlider`, `VolumeControl` and the player's seek bar have the slider role. The fader, parameter slider and volume control report a readable value, such as "−6.0 dB" or "Silent". `Knob` and `PanControl` have the slider role too, and read their values as "−6 dB" or "30% left". `Waveform` is a slider too while seeking is on, reading "1:24 of 3:40". They all share one keyboard map:
 
 | Key                                | Action            |
 | ---------------------------------- | ----------------- |
