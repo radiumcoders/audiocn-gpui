@@ -40,7 +40,9 @@ export const searchGroups = (tree: Root): SearchGroup[] => {
     items: [],
     label: section.label,
   }));
-  for (const page of flattenTree(tree.children)) {
+  // The GPUI docs sit in the tree's fallback (unlisted in the root meta.json).
+  const nodes = [...tree.children, ...(tree.fallback?.children ?? [])];
+  for (const page of flattenTree(nodes)) {
     const section = sectionOf(page.url);
     const group = groups[SECTIONS.indexOf(section)];
     const isOverview = section !== GETTING_STARTED && page.url === section.path;

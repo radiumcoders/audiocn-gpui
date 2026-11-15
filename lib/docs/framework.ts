@@ -1,4 +1,4 @@
-import type { Folder, Node, Root } from "fumadocs-core/page-tree";
+import type { Node, Root } from "fumadocs-core/page-tree";
 
 /**
  * audiocn ships for two frameworks: the React registry (`/docs/...`) and the
@@ -26,38 +26,11 @@ export const twinPath = (pathname: string, target: Framework): string => {
   return `/docs${pathname.slice(GPUI_BASE.length)}`;
 };
 
-const isGpuiFolder = (node: Node): node is Folder =>
-  node.type === "folder" &&
-  (node.index?.url === GPUI_BASE ||
-    node.children.some(
-      (child) => child.type === "page" && frameworkOf(child.url) === "gpui"
-    ) ||
-    node.$id?.endsWith("gpui") === true);
-
 /**
- * Splits the docs tree into a React root and the GPUI root, so the sidebar
- * shows one framework at a time: Fumadocs shows the root folder that holds the
- * current page.
+ * Every page URL in the tree, for the switch to know which twins exist. The
+ * GPUI folder isn't listed in the root meta.json, so Fumadocs keeps it in the
+ * tree's `fallback`.
  */
-export const splitFrameworks = (tree: Root): Root => {
-  const gpui = tree.children.find(isGpuiFolder);
-  if (!gpui) {
-    return tree;
-  }
-  const react: Folder = {
-    $id: "react",
-    children: tree.children.filter((node) => node !== gpui),
-    name: "React",
-    root: true,
-    type: "folder",
-  };
-  return {
-    ...tree,
-    children: [react, { ...gpui, root: true }],
-  };
-};
-
-/** Every page URL in the tree, for the switch to know which twins exist. */
 export const pageUrls = (tree: Root): string[] => {
   const urls: string[] = [];
   const visit = (nodes: Node[]) => {
@@ -73,5 +46,8 @@ export const pageUrls = (tree: Root): string[] => {
     }
   };
   visit(tree.children);
+  if (tree.fallback) {
+    visit(tree.fallback.children);
+  }
   return urls;
 };
