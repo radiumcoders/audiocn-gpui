@@ -1320,7 +1320,11 @@ text_part!(
     /// AudioPlayerDescription::new().child("audiocn")
     /// ```
     AudioPlayerDescription,
-    |t, el| el.min_w_0().truncate().text_xs_().text_color(t.muted_foreground)
+    |t, el| el
+        .min_w_0()
+        .truncate()
+        .text_xs_()
+        .text_color(t.muted_foreground)
 );
 
 text_part!(

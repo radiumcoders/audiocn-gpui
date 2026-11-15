@@ -218,9 +218,8 @@ impl WaveLine {
             } else {
                 now_ms / MS_PER_SECOND
             };
-            for point in 0..count {
-                self.targets[point] =
-                    loading_pulse(point as f64 / (count as f64 - 1.0), seconds) as f32;
+            for (point, target) in self.targets.iter_mut().take(count).enumerate() {
+                *target = loading_pulse(point as f64 / (count as f64 - 1.0), seconds) as f32;
             }
             return;
         }
