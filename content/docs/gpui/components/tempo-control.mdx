@@ -1,0 +1,224 @@
+---
+title: Tempo Control
+description: An editable BPM input for GPUI with tap tempo, keyboard stepping and a rolling average.
+seoDescription: A BPM input with tap tempo for GPUI apps in Rust, with keyboard stepping, a rolling average and a custom tap trigger. The audiocn Tempo Control for Zed's UI framework.
+---
+
+<GpuiExample demo="tempo-control" eager />
+
+## Installation
+
+```bash
+cargo add audiocn
+```
+
+## Usage
+
+```rust
+use audiocn::TempoControl;
+```
+
+```rust
+let view = cx.entity();
+
+TempoControl::new("tempo")
+    .default_value(120.)
+    .on_value_change(move |bpm, _details, _window, cx| {
+        view.update(cx, |this, cx| {
+            this.bpm = bpm;
+            cx.notify();
+        });
+    })
+```
+
+Tap at least twice to measure a tempo. The control averages the last four intervals and starts a new sequence after more than two seconds without a tap. Typing or stepping the input clears the tap history.
+
+BPM values are always whole numbers. Tapped, typed and externally supplied fractional values round to the nearest integer. The default range is 30-600 BPM; set `.min(..)` and `.max(..)` to suit your application.
+
+## Anatomy
+
+The input and tap button render by default. Add children to arrange the parts, change their labels, or omit the tap button.
+
+```rust
+TempoControl::new("tempo")
+    .child(TempoControlInput::new())
+    .child(TempoControlTap::new().child("Tap tempo"))
+```
+
+`TempoControl::new` takes an element id, which keeps the field, its focus and the tap history between renders. The parts read the control's state while they render, so they work in any layout inside it.
+
+## Examples
+
+### Custom elements
+
+<GpuiExample demo="tempo-control" variant="pad" />
+
+Use `TempoControlTap::render(..)` to replace the default trigger with a custom element. The closure gets a `TempoControlTapProps` with a `tap` handler to call on press, the `disabled` state and the tap's children. This example combines a sound pad with a tempo readout.
+
+```rust
+TempoControlTap::new()
+    .child(SoundPadLabel::new().child("Tap tempo"))
+    .render(|props, _window, _cx| {
+        let tap = props.tap.clone();
+        SoundPad::new("pad")
+            .disabled(props.disabled)
+            .on_trigger(move |window, cx| tap(window, cx))
+            .children(props.children)
+            .into_any_element()
+    })
+```
+
+### Controlled BPM
+
+<GpuiExample demo="tempo-control" variant="controlled" />
+
+`value` remains owned by the parent. `on_value_change` reports changes with a `TempoChangeDetails` whose reason is `Tap`, `Keyboard` or `Input` (from `audiocn::signal::tap_tempo`). `on_value_committed` fires after a measured tap, keyboard step, or text edit committed by blurring the input or pressing Enter.
+
+### Sizes and disabled states
+
+<GpuiExample demo="tempo-control" variant="states" />
+
+`size` and `disabled` inherit from `.config(AudioConfig)`; explicit props win. `.read_only(true)` keeps the input focusable but prevents editing and tapping.
+
+## Theming
+
+The control paints with the active `audiocn::Theme`: the input with `input` at 50%, the focus ring with `ring`, and the tap button with `background`, `border` and `muted` on hover. The React variables and attributes map to builder options:
+
+| React | GPUI |
+| --- | --- |
+| `--tempo-height` | Set by `.size(AudioSize)`: 28, 32 or 36 px. `tempo_control_height(size)` returns it |
+| `data-size` | `.size(..)` |
+| `data-disabled` | `.disabled(true)` |
+| `data-readonly` | `.read_only(true)` |
+| `data-slot` | No equivalent. Style each part directly |
+
+`TempoControl`, `TempoControlInput` and `TempoControlTap` implement `Styled`, so style methods customize the layout and appearance. On the input they apply to the text box.
+
+## Accessibility
+
+- The input is exposed as a spin button labelled "Tempo in beats per minute", inside a group labelled "Tempo". Override them with `TempoControlInput::aria_label(..)` and `TempoControl::aria_label(..)`. GPUI has no `id` or `aria-labelledby`, so a visible label does not name the input by itself; repeat its text in `aria_label`.
+- Space and Enter activate the focused tap button.
+- Disabled and read-only controls ignore taps. Holding a key does not generate repeated taps.
+- Press feedback is a background colour change, with no animation.
+
+```rust
+div()
+    .child("Delay tempo")
+    .child(
+        TempoControl::new("delay-tempo")
+            .child(TempoControlInput::new().aria_label("Delay tempo"))
+            .child(TempoControlTap::new()),
+    )
+```
+
+| Focus      | Key                 | Action                 |
+| ---------- | ------------------- | ---------------------- |
+| Input      | Up / Down           | Change by 1 BPM        |
+| Input      | Shift + Up / Down   | Change by `large_step` |
+| Input      | Page Up / Page Down | Change by `large_step` |
+| Input      | Home / End          | Set `min` / `max`      |
+| Tap button | Space / Enter       | Tap once               |
+
+## API reference
+
+### TempoControl
+
+<PropsTable
+  rows={[
+    [
+      "new",
+      "(id: impl Into<ElementId>)",
+      null,
+      "Keeps the field, focus and tap history between renders.",
+    ],
+    ["value / default_value", "f32", "120. (uncontrolled)", "BPM."],
+    [
+      "on_value_change",
+      "Fn(f32, TempoChangeDetails, &mut Window, &mut App)",
+      null,
+      "details.reason is Tap, Keyboard or Input.",
+    ],
+    [
+      "on_value_committed",
+      "Fn(f32, &mut Window, &mut App)",
+      null,
+      "On measured tap, keyboard step, Enter or input blur.",
+    ],
+    [
+      "min / max",
+      "f32",
+      "30. / 600.",
+      "Positive whole BPM bounds; min must not exceed max.",
+    ],
+    [
+      "large_step",
+      "f32",
+      "10.",
+      "Increment for Shift + Up / Down, Page Up and Page Down. Rounded, at least 1.",
+    ],
+    [
+      "tap_timeout",
+      "f64",
+      "2000.",
+      "Idle milliseconds. Set at least 60000 / min to support the slowest tempo.",
+    ],
+    ["size", "AudioSize", "Default", "Inherits from config."],
+    ["disabled / read_only", "bool", "false", null],
+    ["aria_label", "impl Into<SharedString>", '"Tempo"', "Name of the group."],
+    [
+      "name",
+      "impl Into<SharedString>",
+      null,
+      "Kept for parity with React; GPUI has no forms.",
+    ],
+    [
+      "config",
+      "AudioConfig",
+      null,
+      "Size and disabled from a surrounding container.",
+    ],
+  ]}
+/>
+
+### TempoControlInput
+
+<PropsTable
+  rows={[
+    [
+      "aria_label",
+      "impl Into<SharedString>",
+      '"Tempo in beats per minute"',
+      null,
+    ],
+    [
+      "on_change",
+      "Fn(SharedString, &mut Window, &mut App)",
+      null,
+      "The raw text after every edit.",
+    ],
+  ]}
+/>
+
+### TempoControlTap
+
+A disabled or read-only root always disables tapping.
+
+<PropsTable
+  rows={[
+    ["child / children", "impl IntoElement", '"Tap"', "The button's content."],
+    ["disabled", "bool", "false", null],
+    ["aria_label", "impl Into<SharedString>", '"Tap tempo"', null],
+    [
+      "on_click",
+      "Fn(&TapClick, &mut Window, &mut App)",
+      null,
+      "Runs before the tap. click.prevent_default() cancels it.",
+    ],
+    [
+      "render",
+      "FnOnce(TempoControlTapProps, &mut Window, &mut App) -> AnyElement",
+      null,
+      "Replaces the button with a custom trigger that calls props.tap.",
+    ],
+  ]}
+/>

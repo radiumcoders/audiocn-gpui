@@ -18,6 +18,7 @@ const SECTIONS = [
   { label: "Blocks", path: "/docs/blocks" },
   { label: "Hooks", path: "/docs/hooks" },
   { label: "Concepts", path: "/docs/concepts" },
+  { label: "GPUI", path: "/docs/gpui" },
 ] as const;
 
 const [GETTING_STARTED] = SECTIONS;

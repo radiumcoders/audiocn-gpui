@@ -1,0 +1,144 @@
+---
+title: Electric Waveform
+description: One electric line across the width, with a crackling white-hot core, a tall glow, forks off the peaks and sparks, painted by GPUI.
+seoDescription: An electric waveform for GPUI apps in Rust, with a crackling white-hot line, glow, lightning forks and sparks, as a wave or an oscilloscope. The audiocn Electric Waveform for Zed's UI framework.
+---
+
+<GpuiExample demo="electric-waveform" eager />
+
+## Installation
+
+```bash
+cargo add audiocn
+```
+
+## Usage
+
+```rust
+use audiocn::{ActiveTheme, ElectricWaveform};
+```
+
+```rust
+ElectricWaveform::new("voice")
+    .aria_label("Voice activity")
+    .text_color(cx.theme().primary)
+    .h(px(128.))
+    .source(visual.clone())
+```
+
+`visual` is a `FrameSource<VisualFrame>`, such as `use_microphone(..).visual`. `ElectricWaveform::new` takes an element id, which keeps the line, its forks and sparks between renders. Give each waveform an id that is unique among its siblings.
+
+The line follows the text colour, so it changes with your theme, and in dark mode its core runs white-hot. It shares its look and builder options with the [electric bar visualizer](/docs/gpui/components/electric-bar-visualizer).
+
+The waveform fills the width and is 96px tall by default, so size it with `Styled` methods such as `.h(..)` and `.max_w(..)`. It paints on every animation frame inside the element, without re-rendering your view, follows its bounds and picks up theme changes on its own.
+
+## Examples
+
+### Wave and scope
+
+`ElectricWaveformMode::Wave` draws a smooth wave shaped by the frequency bands, calm enough for a voice assistant. `ElectricWaveformMode::Scope` draws the signal itself, like an oscilloscope, and starts each frame on a rising zero crossing so steady tones stand still. Scope reads the frame's `time_domain` samples.
+
+<GpuiExample demo="electric-waveform" variant="modes" />
+
+### Intensity, arcs and sparks
+
+`.intensity(..)` sets how jagged and restless the line is. `.arcs(..)` fork off the peaks and `.sparks(..)` fly when the level rises quickly.
+
+<GpuiExample demo="electric-waveform" variant="intensity" />
+
+### Idle and loading
+
+With no signal the line rests flat and hums. `.loading(true)` runs a pulse along it, for connecting or thinking states.
+
+<GpuiExample demo="electric-waveform" variant="states" />
+
+### Microphone
+
+The browser preview has no microphone: "Use my microphone" feeds the scope from the demo speech signal instead. In a native app, enable the `device` feature and pass the visual source of `audiocn::io::use_microphone`:
+
+```bash
+cargo add audiocn --features device
+```
+
+```rust
+use audiocn::io::{MicrophoneOptions, MicrophoneStatus, use_microphone};
+use audiocn::{ElectricWaveform, ElectricWaveformMode};
+
+let mic = use_microphone("mic", MicrophoneOptions::default(), window, cx);
+let listening = mic.status == MicrophoneStatus::Active;
+
+ElectricWaveform::new("mic-line")
+    .mode(ElectricWaveformMode::Scope)
+    .source(mic.visual.clone())
+// In a button's on_click: if listening { mic.stop(cx) } else { mic.start(cx) }
+```
+
+The gallery runs the real microphone with `cargo run -p audiocn-gallery --features device`.
+
+<GpuiExample demo="electric-waveform" variant="microphone" />
+
+## Theming
+
+The waveform paints with the active `audiocn::Theme`. The React CSS variables are builder options here:
+
+| React | GPUI |
+| --- | --- |
+| `--electric` | `.electric(color)`, default the text colour (`.text_color(..)`) |
+| `--electric-core` | `.electric_core(color)`, default `electric` mixed toward white by the heat |
+| `--electric-heat` | `.electric_heat(f32)`, 0..1, default `0.` in light mode and `0.7` in dark mode (`Theme::is_dark`) |
+| `--electric-glow` | `.electric_glow(color)`, default `electric` |
+| `--electric-glow-size` | `.electric_glow_size(f32)`, the glow blur in pixels, default `8.` |
+| `data-mode`, `data-active`, `data-loading` | No equivalent: the state is what you pass to the builder |
+
+## Accessibility
+
+GPUI has no accessibility tree for this element yet. `.aria_label(..)` is accepted for parity with React, default "Audio waveform", but is not exposed.
+
+The flicker changes brightness by at most 12% and each jagged shape holds for at least 40 ms, so nothing flashes. With reduced motion the line is smooth and still, with no crackle, forks or sparks, and redraws four times a second. GPUI has no system query for it, so set it with `audiocn::signal::reduced_motion::set_reduced_motion(true, cx)`.
+
+## API reference
+
+<PropsTable
+  rows={[
+    [
+      "new",
+      "(id: impl Into<ElementId>)",
+      null,
+      "Keeps the line, forks and sparks between renders.",
+    ],
+    ["source", "impl Into<Option<FrameSource<VisualFrame>>>", null, null],
+    [
+      "mode",
+      "ElectricWaveformMode",
+      "Wave",
+      "Wave follows the frequency bands; Scope draws the signal.",
+    ],
+    ["loading", "bool", "false", "Run a pulse along the line."],
+    ["intensity", "f32", "0.6", "How jagged and restless the line is, 0..1."],
+    ["arcs", "bool", "true", "Forks of lightning branch off the peaks."],
+    ["sparks", "bool", "true", "Sparks fly off the peaks on sudden rises."],
+    ["sensitivity", "f32", "1.", "Visual gain."],
+    ["line_width", "f32", "3.", "Pixels."],
+    ["fade_edges", "bool", "true", "Fade the left and right ends."],
+    [
+      "actions",
+      "ElectricWaveformActions",
+      null,
+      "Keep a clone and call paint(VisualFrame) or clear().",
+    ],
+    [
+      "electric / electric_core / electric_glow",
+      "impl Into<Hsla>",
+      null,
+      "See Theming.",
+    ],
+    ["electric_heat", "f32", "0. light, 0.7 dark", null],
+    ["electric_glow_size", "f32", "8.", "Glow blur in pixels."],
+    [
+      "aria_label",
+      "impl Into<SharedString>",
+      '"Audio waveform"',
+      "Kept for parity; not exposed yet.",
+    ],
+  ]}
+/>

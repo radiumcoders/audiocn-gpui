@@ -1,0 +1,65 @@
+---
+title: use_level
+description: Read a meter source into your view at a low rate, for labels and conditional UI.
+seoDescription: use_level samples an audiocn FrameSource a few times a second in GPUI and re-renders only when the level changes, for labels and clipping warnings in Rust.
+---
+
+Meters paint every frame on their own. When you need the level in your view, for a label or to show a warning, `use_level` samples the source a few times a second and re-renders the view only when the level changes.
+
+```bash
+cargo add audiocn
+```
+
+## Usage
+
+```rust
+use audiocn::MeterZoneName;
+use audiocn::signal::level::{LevelOptions, LevelState, use_level};
+
+let LevelState { peak_db, zone, .. } =
+    use_level("mic-level", Some(mic.meter.clone()), LevelOptions::default(), window, cx);
+
+div().when(zone == MeterZoneName::Clip, |el| el.child("Turn your microphone down."))
+```
+
+Pass `None` as the source to stop sampling. Outside a render, `LevelSampler` holds the same state: call `poll(&source, now_ms)` and read `state()`.
+
+## Options
+
+`LevelOptions`:
+
+<PropsTable
+  rows={[
+    ["interval_ms", "f64", "250.", "How often the level updates."],
+    [
+      "channel",
+      "LevelChannel",
+      "Max",
+      "LevelChannel::Index(i) for one channel, or Max for the loudest.",
+    ],
+    ["zones", "Vec<MeterZone>", "DEFAULT_ZONES", "Zones used to compute zone."],
+    ["enabled", "bool", "true", "Pause sampling."],
+  ]}
+/>
+
+## Returns
+
+`LevelState`:
+
+<PropsTable
+  rows={[
+    [
+      "peak_db",
+      "f32",
+      null,
+      "Peak level in dBFS. f32::NEG_INFINITY until the first sample.",
+    ],
+    [
+      "rms_db",
+      "Option<f32>",
+      null,
+      "RMS level in dBFS, when the source measures it.",
+    ],
+    ["zone", "MeterZoneName", null, "Ok, Warn or Clip: the zone of peak_db."],
+  ]}
+/>

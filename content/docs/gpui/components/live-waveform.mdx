@@ -1,0 +1,135 @@
+---
+title: Live Waveform
+description: A waveform of a live signal, as scrolling history or the current frame, painted by GPUI.
+seoDescription: A live waveform for GPUI apps in Rust that draws scrolling level history or the current frame as bars, mirrored bars or a line. The audiocn Live Waveform for Zed's UI framework.
+---
+
+<GpuiExample demo="live-waveform" eager />
+
+## Installation
+
+```bash
+cargo add audiocn
+```
+
+## Usage
+
+```rust
+use audiocn::{LiveWaveform, LiveWaveformMode};
+```
+
+```rust
+LiveWaveform::new("mic")
+    .mode(LiveWaveformMode::Scrolling)
+    .source(visual.clone())
+    .h(px(64.))
+```
+
+`visual` is a `FrameSource<VisualFrame>`, such as `use_microphone(..).visual`. `LiveWaveform::new` takes an element id, which keeps the scroll position and the last frame between renders. Give each waveform an id that is unique among its siblings.
+
+The waveform fills the width and is 64px tall by default, so size it with `Styled` methods such as `.h(..)`. It follows its bounds and picks up theme changes on its own.
+
+Scrolling moves between history samples without adding samples. The source's history interval sets the minimum wait, 50 ms by default (`AnalyserTapOptions::history_interval_ms`). The source takes the next sample on the first frame after that wait. With 16 ms frames, samples arrive every 64 ms, and a bar moves one step over those 64 ms.
+
+The drawing uses a short buffer so it can follow measured sample times without guessing when the next sample will arrive. This adds twice the configured history interval as display delay, 100 ms by default. If frames pause or slow down, the built-in sources skip missed samples rather than repeat stale levels. If you use a custom source, set the [history timing fields](/docs/gpui/concepts/feeding-data#frames) of `VisualFrame` (`history_updated_at` and `history_interval_ms`) to enable smooth scrolling.
+
+A `FrameSource` can't wake a settled element in GPUI, so while `.active(true)` with a source or actions the waveform keeps asking for animation frames to look for new ones. With `.active(false)`, or no source, it finishes its buffered scroll and stops.
+
+## Examples
+
+### Variants
+
+<GpuiExample demo="live-waveform" variant="variants" />
+
+### Idle
+
+With `.active(false)` the waveform shows a dotted line.
+
+<GpuiExample demo="live-waveform" variant="idle" />
+
+### Microphone
+
+The browser preview has no microphone: "Use my microphone" switches the waveform to the demo speech signal instead. In a native app, enable the `device` feature and pass the visual source of `audiocn::io::use_microphone`. A longer history fills the width:
+
+```bash
+cargo add audiocn --features device
+```
+
+```rust
+use audiocn::io::{AnalyserTapOptions, MicrophoneOptions, MicrophoneStatus, use_microphone};
+use audiocn::{LiveWaveform, LiveWaveformMode};
+
+let mic = use_microphone(
+    "mic",
+    MicrophoneOptions {
+        analyser: AnalyserTapOptions { history_size: 120, ..Default::default() },
+        ..Default::default()
+    },
+    window,
+    cx,
+);
+let listening = mic.status == MicrophoneStatus::Active;
+
+LiveWaveform::new("mic-waveform")
+    .active(listening)
+    .mode(LiveWaveformMode::Scrolling)
+    .source(mic.visual.clone())
+// In a button's on_click: if listening { mic.stop(cx) } else { mic.start(cx) }
+```
+
+The gallery runs the real microphone with `cargo run -p audiocn-gallery --features device`.
+
+<GpuiExample demo="live-waveform" variant="microphone" />
+
+## Theming
+
+| React | GPUI |
+| --- | --- |
+| `--waveform` | `.text_color(color)`, default the inherited text colour |
+| `data-mode`, `data-variant` | No equivalent: `.mode(..)` and `.variant(..)` are what you passed |
+| `data-active` | No equivalent: `.active(..)` is what you passed |
+
+## Accessibility
+
+GPUI has no accessibility tree for this element yet, and `LiveWaveform` has no `aria_label`. Label the meter or control next to it instead. With reduced motion it redraws four times a second. GPUI has no system query for it, so set it with `audiocn::signal::reduced_motion::set_reduced_motion(true, cx)`.
+
+## API reference
+
+<PropsTable
+  rows={[
+    [
+      "new",
+      "(id: impl Into<ElementId>)",
+      null,
+      "Keeps the scroll and the last frame between renders.",
+    ],
+    ["source", "FrameSource<VisualFrame>", null, null],
+    [
+      "mode",
+      "LiveWaveformMode",
+      "Static",
+      "Scrolling shows level history; Static shows the current frame.",
+    ],
+    [
+      "variant",
+      "LiveWaveformVariant",
+      "Bars",
+      "Bars, Line or Mirror. Line draws the waveform trace in static mode.",
+    ],
+    ["bar_width", "f32", "3.", "Pixels."],
+    ["bar_gap", "f32", "1.", "Pixels."],
+    ["bar_radius", "f32", "1.5", "Pixels."],
+    ["min_bar_height", "f32", "4.", "Pixels."],
+    ["line_width", "f32", "1.5", "For the Line variant."],
+    ["fade_edges", "bool", "true", "Fade the left and right edges."],
+    ["fade_width", "f32", "24.", "Pixels."],
+    ["active", "bool", "true", "false shows an idle dotted line."],
+    ["sensitivity", "f32", "1.", "Visual gain."],
+    [
+      "actions",
+      "&LiveWaveformActions",
+      null,
+      "Keep a clone and call paint(VisualFrame) or clear().",
+    ],
+  ]}
+/>

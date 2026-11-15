@@ -1,0 +1,94 @@
+---
+title: ClipHold
+description: Clip detection with a hold time, a clip count and a reset.
+seoDescription: ClipHold is audiocn's clip latch for GPUI and plain Rust, with a threshold, a hold time, a clip count and a reset. It powers the ClipIndicator component.
+---
+
+`ClipHold` powers the [clip indicator](/docs/gpui/components/clip-indicator). Feed it every level reading; it tells you when the signal clipped and keeps that state for a while so people can see it.
+
+```bash
+cargo add audiocn
+```
+
+## Usage
+
+React's `useClipHold` releases the light with a timer. `ClipHold` is plain state with no timer of its own: the release is a deadline on a millisecond clock, so it works the same in a view, a test or an audio thread.
+
+```rust
+use audiocn::audio::frame_loop::now_ms;
+use audiocn::signal::clip_hold::{ClipHold, ClipHoldOptions};
+
+struct Monitor {
+    clip: ClipHold,
+}
+
+// in render:
+let now = now_ms();
+let peak_db = meter.with_latest(|frame| {
+    frame.and_then(|frame| frame.channels.first()).map_or(f32::NEG_INFINITY, |c| c.peak_db)
+});
+self.clip.report(peak_db, now);
+self.clip.update(now);
+window.request_animation_frame();
+
+div().when(self.clip.clipping(), |el| el.child(format!("Clipping ({})", self.clip.count())))
+```
+
+Create it with `ClipHold::new(ClipHoldOptions { hold_ms: 2000., ..Default::default() })`. `report` and `update` return `Some(clipping)` when the state changed, which is where React calls `onClippingChange`.
+
+## Options
+
+`ClipHoldOptions`:
+
+<PropsTable
+  rows={[
+    ["threshold_db", "f32", "-1.", "Levels at or above this count as a clip."],
+    [
+      "hold_ms",
+      "f64",
+      "1500.",
+      "How long the clip state holds. f64::INFINITY latches until reset().",
+    ],
+  ]}
+/>
+
+## Returns
+
+`ClipHold` methods:
+
+<PropsTable
+  rows={[
+    ["clipping", "() -> bool", null, "The clip state, including the hold."],
+    [
+      "count",
+      "() -> u32",
+      null,
+      "Separate clips since creation or the last reset. A long clip counts once.",
+    ],
+    [
+      "report",
+      "(db: f32, now_ms: f64) -> Option<bool>",
+      null,
+      "Feed a level reading. Cheap to call every frame. Returns the new state when it changed.",
+    ],
+    [
+      "update",
+      "(now_ms: f64) -> Option<bool>",
+      null,
+      "Releases the light once the hold has passed.",
+    ],
+    [
+      "release_at_ms",
+      "() -> Option<f64>",
+      null,
+      "When the light goes out, to schedule a timer instead of polling.",
+    ],
+    ["reset", "() -> Option<bool>", null, "Clear the state and the count."],
+    [
+      "set_options",
+      "(options, now_ms: f64)",
+      null,
+      "A new hold time re-arms a pending release.",
+    ],
+  ]}
+/>

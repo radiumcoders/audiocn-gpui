@@ -1,0 +1,107 @@
+---
+title: Clip Indicator
+description: A clip light that holds after the signal clips, with an optional count and click to reset, in GPUI.
+seoDescription: A clip light for GPUI apps in Rust that holds after the signal clips, counts clips, latches until reset and never shifts the layout. The audiocn Clip Indicator for Zed's UI framework.
+---
+
+<GpuiExample demo="clip-indicator" eager />
+
+## Installation
+
+```bash
+cargo add audiocn
+```
+
+## Usage
+
+```rust
+use audiocn::ClipIndicator;
+```
+
+```rust
+ClipIndicator::new("clip").source(meter.clone())
+```
+
+`ClipIndicator::new` takes an element id, which keeps the light, its count and its release timer between renders. The light turns on when any channel reaches −1 dBFS and stays on for 1.5 s. Clicking it resets the light and the count. Its size never changes, so turning on never moves the layout.
+
+## Examples
+
+### Latching, driven by hand
+
+Set `.hold_ms(f64::INFINITY)` to keep the light on until someone resets it. Use `ClipIndicatorActions` to report levels from your own code.
+
+<GpuiExample demo="clip-indicator" variant="latching" />
+
+```rust
+let clip = ClipIndicatorActions::new(); // keep it, e.g. in keyed state
+ClipIndicator::new("clip").actions(clip.clone()).hold_ms(f64::INFINITY)
+// later
+clip.report(0., window, cx);
+```
+
+### Controlled
+
+Pass `.clipping(..)` when another part of your app decides whether the signal clipped.
+
+```rust
+ClipIndicator::new("clip").clipping(engine.clipped)
+```
+
+`ClipIndicator` has no click handler of its own yet (React's `onClick`), so reset your engine's flag from your own control.
+
+## Theming
+
+The light paints with the active `audiocn::Theme`:
+
+| React | GPUI |
+| --- | --- |
+| `--meter-clip` | `Theme::meter_clip`, the colour of the light when on. The count and text use `Theme::meter_clip_foreground` |
+| `data-clipping` | `ClipIndicatorActions::clipping(cx)`, or `.on_clipping_change(..)` |
+
+Children replace the default dot, so the light can be a word, an icon or anything else. Text children fade to the clip colour with the light. To restyle other children while clipping, read the state with `.on_clipping_change(..)` or `ClipIndicatorActions::clipping(cx)` and rebuild them.
+
+## Accessibility
+
+- A focusable element with the AccessKit role `Button`. Click, Enter or Space resets it. Its label changes to "Clipping. Reset clip indicator" while the light is on.
+- GPUI has no live regions, so the React "Clipping" announcement has no equivalent.
+
+## API reference
+
+<PropsTable
+  rows={[
+    [
+      "new",
+      "(id: impl Into<ElementId>)",
+      null,
+      "Keeps the light, count and release timer between renders.",
+    ],
+    [
+      "clipping",
+      "bool",
+      null,
+      "Controlled state: the light shows this instead of what it detected.",
+    ],
+    [
+      "source",
+      "impl Into<Option<FrameSource<MeterFrame>>>",
+      null,
+      "Detects clipping from a meter source.",
+    ],
+    ["threshold_db", "f32", "-1.", "Levels at or above this count as a clip."],
+    [
+      "hold_ms",
+      "f64",
+      "1500.",
+      "How long the light stays on. f64::INFINITY latches.",
+    ],
+    ["on_clipping_change", "Fn(bool, &mut Window, &mut App)", null, null],
+    ["show_count", "bool", "false", "Show the number of clips."],
+    [
+      "actions",
+      "ClipIndicatorActions",
+      null,
+      "report(db, window, cx), reset(window, cx), clipping(cx) and count(cx).",
+    ],
+    ["child / children", "any element", "a dot", "Replaces the light."],
+  ]}
+/>

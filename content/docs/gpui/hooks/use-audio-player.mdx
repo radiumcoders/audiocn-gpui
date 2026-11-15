@@ -1,0 +1,118 @@
+---
+title: use_audio_player
+description: Native playback with the state of a media element, for the AudioPlayer component.
+seoDescription: use_audio_player plays audio files natively in GPUI with audiocn's device feature, with the playback state of an audio element, a smooth playhead and meter sources.
+---
+
+```bash
+cargo add audiocn --features device
+```
+
+## Usage
+
+```rust
+use audiocn::io::use_audio_player;
+use audiocn::{AudioPlayerController, UseAudioPlayerOptions, Waveform};
+
+let player = use_audio_player("episode", UseAudioPlayerOptions::src("/audio/episode.mp3"), window, cx);
+let state = player.state(cx);
+
+div()
+    .child(Button::new("toggle").child(if state.playing { "Pause" } else { "Play" }).on_click({
+        let player = player.clone();
+        move |_, window, cx| player.toggle(window, cx)
+    }))
+    .child(
+        Waveform::new("waveform")
+            .peaks(peaks.clone())
+            .duration(state.duration)
+            .time(player.time(cx))
+            .on_seek_committed(move |seconds, window, cx| player.seek(seconds, window, cx)),
+    )
+```
+
+`use_audio_player` keeps an `AudioPlayerEngine` entity under its id and applies the options on every render. The whole file is decoded into memory on a background thread when `src` is set, so `buffered` jumps to the duration once it is ready. `src` is a file path, a `file://` URL, or a site path like `/audio/episode.mp3`, resolved against `audiocn::io::set_asset_root`. Remote URLs are not supported.
+
+Pass the player to [`AudioPlayer`](/docs/gpui/components/audio-player) with `.player(player)`. Or call `audiocn::io::install_audio_player_backend(cx)` once, and every `AudioPlayer::new(..).src(..)` plays through its own engine. The engine's `meter_source()` and `visual_source()` feed meters and visualizers, and `set_destination` routes it into a [`WebAudioMixer`](/docs/gpui/hooks/use-web-audio-mixer) channel.
+
+Without the `device` feature, `use_simulated_player(id, duration, options, window, cx)` has the same states and events with no sound, for previews and tests.
+
+## Options
+
+`UseAudioPlayerOptions`:
+
+<PropsTable
+  rows={[
+    [
+      "src",
+      "Option<SharedString>",
+      null,
+      "UseAudioPlayerOptions::src(..) sets only this.",
+    ],
+    ["auto_play / loop / muted", "bool", "false", "loop is r#loop in Rust."],
+    ["volume", "f32", "1.", "0..1."],
+    ["playback_rate", "f32", "1.", null],
+    ["preload", "AudioPreload", "Metadata", "None, Metadata or Auto."],
+    [
+      "cross_origin",
+      "Option<CrossOrigin>",
+      null,
+      "Accepted for parity; remote sources are not supported natively.",
+    ],
+    [
+      "on_play / on_pause / on_ended",
+      "Option<Rc<dyn Fn(&mut Window, &mut App)>>",
+      null,
+      null,
+    ],
+    [
+      "on_error",
+      "Option<Rc<dyn Fn(Option<SharedString>, &mut Window, &mut App)>>",
+      null,
+      null,
+    ],
+  ]}
+/>
+
+## Returns
+
+An `Entity<AudioPlayerEngine>`, which implements `AudioPlayerController`. `state(cx)` returns an `AudioPlayerState`:
+
+<PropsTable
+  rows={[
+    [
+      "status",
+      "AudioPlayerStatus",
+      null,
+      "Idle, Loading, Ready, Playing, Paused, Ended or Error.",
+    ],
+    ["playing", "bool", null, null],
+    ["current_time", "f64", null, "Updates about four times a second."],
+    [
+      "time(cx)",
+      "FrameSource<f64>",
+      null,
+      "The time on every frame while playing, from the audio thread.",
+    ],
+    ["duration / buffered", "f64", null, "Seconds."],
+    [
+      "volume / muted / playback_rate / loop",
+      "f32 | bool",
+      null,
+      "Current settings.",
+    ],
+    ["error", "Option<SharedString>", null, null],
+    [
+      "play / pause / toggle / seek",
+      "(window, cx) / (seconds, window, cx)",
+      null,
+      null,
+    ],
+    [
+      "set_volume / set_muted / set_playback_rate / set_loop",
+      "(value, window, cx)",
+      null,
+      null,
+    ],
+  ]}
+/>

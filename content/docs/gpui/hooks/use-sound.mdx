@@ -1,0 +1,83 @@
+---
+title: use_sound
+description: Low-latency playback of short sounds decoded into memory.
+seoDescription: use_sound plays short sounds natively in GPUI with audiocn's device feature, decoded once into memory, for sound pads, soundboards and UI clicks.
+---
+
+```bash
+cargo add audiocn --features device
+```
+
+## Usage
+
+```rust
+use audiocn::io::{SoundOptions, use_sound};
+
+let ding = use_sound("ding", Some("/sounds/ding.wav"), SoundOptions { volume: 0.8, ..Default::default() }, window, cx);
+
+Button::new("ding").child("Ding").on_click(move |_, _, _| ding.play())
+```
+
+The sound is decoded on a background thread, once per `src` for the whole app, then plays instantly on every trigger. `src` is a file path or a site path resolved against `audiocn::io::set_asset_root`; wav, mp3, ogg/vorbis and flac decode. `Sound::from_buffer(buffer, options)` plays an `AudioBuffer` you made yourself. Pass `None` as `src` for a sound that never loads.
+
+## Routing
+
+By default a sound plays through the speakers. Pass `Destination::Bus(..)` to play it into a mixer channel, or `Destination::None` and take its output yourself:
+
+```rust
+let pad = use_sound(
+    "pad",
+    Some(src),
+    SoundOptions { destination: Destination::Bus(graph.input_bus("sounds")), ..Default::default() },
+    window,
+    cx,
+);
+```
+
+## Options
+
+`SoundOptions`:
+
+<PropsTable
+  rows={[
+    ["volume", "f32", "1.", "0..1 gain, ramped over 5 ms."],
+    ["playback_rate", "f32", "1.", null],
+    ["loop", "bool", "false", "r#loop in Rust."],
+    ["interrupt", "bool", "true", "Restart instead of layering."],
+    [
+      "max_voices",
+      "usize",
+      "4",
+      "Most simultaneous voices when not interrupting. The oldest is cut.",
+    ],
+    [
+      "destination",
+      "Destination",
+      "Speakers",
+      "Destination::None leaves the output unconnected, for take_output().",
+    ],
+  ]}
+/>
+
+## Returns
+
+`Sound`, cheap to clone:
+
+<PropsTable
+  rows={[
+    ["play / stop", "()", null, "play is a no-op until the sound is loaded."],
+    ["is_playing / is_loaded / is_loading", "() -> bool", null, null],
+    ["duration", "() -> f64", null, "Seconds, 0 until loaded."],
+    ["progress", "() -> FrameSource<f32>", null, "0..1 while playing."],
+    ["output", "() -> Option<Bus>", null, "The sound's output node input."],
+    [
+      "take_output",
+      "() -> Option<Box<dyn AudioSource>>",
+      null,
+      "With Destination::None: the output, once, to route yourself.",
+    ],
+    ["error", "() -> Option<AudioIoError>", null, null],
+  ]}
+/>
+
+`AudioBuffer::load_cached(src)` decodes a file once and caches it, for preloading.

@@ -1,0 +1,148 @@
+---
+title: Spectrum
+description: A frequency spectrum analyser with axes, a grid and peak hold, painted by GPUI.
+seoDescription: A frequency spectrum analyser for GPUI apps in Rust, with bars, line or area drawing, dB and Hz axes, a grid and peak hold. The audiocn Spectrum for Zed's UI framework.
+---
+
+<GpuiExample demo="spectrum" eager />
+
+## Installation
+
+```bash
+cargo add audiocn
+```
+
+## Usage
+
+```rust
+use audiocn::Spectrum;
+```
+
+```rust
+use audiocn::io::{AnalyserTapOptions, MicrophoneOptions, use_microphone};
+
+let mic = use_microphone(
+    "mic",
+    MicrophoneOptions {
+        analyser: AnalyserTapOptions { bands: 64, ..Default::default() },
+        ..Default::default()
+    },
+    window,
+    cx,
+);
+
+Spectrum::new("spectrum").source(mic.visual.clone())
+```
+
+The spectrum draws the frequency bands of a visual frame. Set `min_hz`, `max_hz`, `min_db` and `max_db` to match the analyser that produced them, so the axes are labelled correctly. The defaults match `AnalyserTapOptions`. `Spectrum::new` takes an element id, which keeps the held peaks between renders.
+
+The spectrum fills the width and is 160px tall by default, so size it with `Styled` methods such as `.h(..)` and `.max_w(..)`.
+
+## Anatomy
+
+```rust
+use audiocn::{Spectrum, SpectrumCanvas, SpectrumFrequencyAxis, SpectrumLevelAxis};
+
+Spectrum::new("spectrum")
+    .child(SpectrumLevelAxis::new())
+    .child(SpectrumCanvas::new())
+    .child(SpectrumFrequencyAxis::new())
+```
+
+A spectrum with no children renders all three. `SpectrumLevelAxis` and `SpectrumFrequencyAxis` take `.ticks(..)` and `.format(..)`, and each `SpectrumCanvas` can override the spectrum's colours.
+
+## Examples
+
+### Line and area
+
+<GpuiExample demo="spectrum" variant="variants" />
+
+### Microphone
+
+The browser preview has no microphone: "Use my microphone" feeds the spectrum from the demo speech signal instead, and stopping leaves the last frame drawn. In a native app, enable the `device` feature and pass the visual source of `audiocn::io::use_microphone`:
+
+```bash
+cargo add audiocn --features device
+```
+
+```rust
+use audiocn::io::{AnalyserTapOptions, MicrophoneOptions, MicrophoneStatus, use_microphone};
+use audiocn::Spectrum;
+
+let mic = use_microphone(
+    "mic",
+    MicrophoneOptions {
+        analyser: AnalyserTapOptions { bands: 64, fft_size: 4096, ..Default::default() },
+        ..Default::default()
+    },
+    window,
+    cx,
+);
+let listening = mic.status == MicrophoneStatus::Active;
+
+Spectrum::new("mic-spectrum").peak_hold(true).source(mic.visual.clone())
+// In a button's on_click: if listening { mic.stop(cx) } else { mic.start(cx) }
+```
+
+The gallery runs the real microphone with `cargo run -p audiocn-gallery --features device`.
+
+<GpuiExample demo="spectrum" variant="microphone" />
+
+## Theming
+
+The spectrum paints with the active `audiocn::Theme`. The React CSS variables are builder options on `Spectrum` or on one `SpectrumCanvas`:
+
+| React             | GPUI                 | Default             |
+| ----------------- | -------------------- | ------------------- |
+| `--spectrum`      | `.color(color)`      | `Theme::primary`    |
+| `--spectrum-peak` | `.peak_color(color)` | `Theme::foreground` |
+| `--spectrum-grid` | `.grid_color(color)` | `Theme::border`     |
+
+## API reference
+
+<PropsTable
+  rows={[
+    [
+      "new",
+      "(id: impl Into<ElementId>)",
+      null,
+      "Keeps held peaks between renders.",
+    ],
+    ["source", "FrameSource<VisualFrame>", null, null],
+    ["source_opt", "Option<FrameSource<VisualFrame>>", null, "None detaches."],
+    ["variant", "SpectrumVariant", "Bars", "Bars, Line or Area."],
+    [
+      "min_db / max_db",
+      "f32",
+      "-100. / -30.",
+      "The level range the bands cover.",
+    ],
+    [
+      "min_hz / max_hz",
+      "f32",
+      "40. / 16000.",
+      "The frequency range the bands cover.",
+    ],
+    ["scale", "SpectrumScale", "Log", "Frequency axis law: Log or Linear."],
+    ["peak_hold", "bool", "false", "Falling peak markers."],
+    ["grid", "bool", "true", null],
+    [
+      "color / peak_color / grid_color",
+      "impl Into<Hsla>",
+      null,
+      "See Theming.",
+    ],
+    [
+      "aria_label",
+      "impl Into<SharedString>",
+      '"Frequency spectrum"',
+      "Name of its AccessKit image role.",
+    ],
+    [
+      "child / children",
+      "SpectrumLevelAxis, SpectrumCanvas or SpectrumFrequencyAxis",
+      null,
+      null,
+    ],
+  ]}
+/>

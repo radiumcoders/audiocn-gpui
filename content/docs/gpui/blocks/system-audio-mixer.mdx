@@ -1,0 +1,184 @@
+---
+title: System Audio Mixer
+description: The complete mixer, with microphone, system audio, music, sound pads and a master, as a GPUI block.
+seoDescription: A complete audio mixer block for GPUI apps in Rust, with microphone, system audio, music and sound pad strips, meters, faders, mute, solo, monitor and a master. Wire it to native audio with the audiocn device feature.
+full: true
+---
+
+<GpuiExample demo="system-audio-mixer" eager />
+
+## Installation
+
+```bash
+cargo add audiocn
+```
+
+The block is part of the crate: `audiocn::SystemAudioMixer`. To feed it real microphones and system audio, add the `device` feature:
+
+```bash
+cargo add audiocn --features device
+```
+
+## What it does
+
+- **Microphone**: choose a device, start and stop it, and see when it is live, muted or blocked.
+- **System audio**: a switch that starts and stops capture, with notices when nothing was shared or the platform cannot capture. With the `device` feature, `audiocn::io::use_system_audio` captures the default output.
+- **Music**: play and skip tracks. On the demo meters, music ducks by 12 dB while the microphone is live. With your own audio, apply the duck in your graph.
+- **Sounds**: a popover of sound pads with hotkeys.
+- **Every channel** has a stereo meter, a fader, mute, solo and a monitor send to the speakers. Microphone monitoring is off by default to avoid feedback.
+- **Master**: a stereo meter with a clip counter, a master fader and mute. There is no `MediaStream` in GPUI: `on_output_change` tells you which inputs are open, as a `MixerActivity`, so you can attach them to your own graph.
+- **Layouts**: switch between rows and console strips.
+
+The block owns no audio graph. Pass a meter per channel, and keep the mixer state in a `MixerStore` to apply its gains to your inputs. Leave anything out and that part runs on its own: demo signals fill the meters, and tracks and pads play on simulated players.
+
+## Console layout
+
+<GpuiExample demo="system-audio-mixer" variant="console" />
+
+## Usage
+
+```rust
+use audiocn::io::{MicrophoneOptions, use_audio_devices, use_microphone};
+use audiocn::signal::mixer::{MixerOptions, use_mixer};
+use audiocn::{
+    AudioDeviceKind, MixerSound, MixerSourceId, MixerTrack, SystemAudioMixer,
+    system_audio_mixer_channels,
+};
+
+let mixer = use_mixer(
+    "studio/mixer",
+    MixerOptions { channels: system_audio_mixer_channels(), ..Default::default() },
+    window,
+    cx,
+);
+let devices = use_audio_devices("studio/devices", AudioDeviceKind::AudioInput, window, cx);
+let mic = use_microphone("studio/mic", MicrophoneOptions::default(), window, cx);
+let (start, stop) = (mic.clone(), mic.clone());
+
+SystemAudioMixer::new("studio")
+    .mixer(mixer)
+    .devices(devices.devices.clone())
+    .permission(devices.permission)
+    .microphone_status(mic.status.into())
+    .on_microphone_start(move |_, cx| start.start(cx))
+    .on_microphone_stop(move |_, cx| stop.stop(cx))
+    .meter(MixerSourceId::Microphone, mic.meter.clone())
+    .on_output_change(|activity, _, _| graph.attach(activity))
+    .sounds([MixerSound::new("ding", "Ding").src("/sounds/ding.mp3").hotkey("1")])
+    .tracks([MixerTrack::new("intro", "Intro").src("/music/intro.mp3")])
+```
+
+Read the strip settings from `mixer.read(cx)` and apply them to each input, for example `handle.set_gain_db(..)` and `handle.set_muted(!store.is_audible("microphone"))` on the microphone. Drive the music and the pads yourself with `music_playing`, `on_music_toggle`, `track_index`, `on_next_track`, `sound_playback` and `on_sound_trigger`, or leave them out to use the built-in simulated players.
+
+## Props
+
+<PropsTable
+  rows={[
+    [
+      "new",
+      "(id: impl Into<SharedString>)",
+      null,
+      "Prefixes the ids of everything inside.",
+    ],
+    [
+      "default_orientation",
+      "Orientation",
+      "Horizontal",
+      "Rows or console strips.",
+    ],
+    [
+      "sources",
+      "impl IntoIterator<Item = MixerSourceId>",
+      "MixerSourceId::ALL",
+      "Which strips to show: Microphone, System, Music, Sounds.",
+    ],
+    [
+      "persist_key",
+      "impl Into<SharedString>",
+      null,
+      "Accepted for parity and not written. Save mixer.read(cx).state yourself.",
+    ],
+    [
+      "on_output_change",
+      "Fn(&MixerActivity, &mut Window, &mut App)",
+      null,
+      "Which inputs are open: microphone_open, system_open, device_id, music_src, sounds_playing.",
+    ],
+    [
+      "tracks",
+      "impl IntoIterator<Item = MixerTrack>",
+      "none",
+      "Tracks for the music channel: MixerTrack::new(id, title).artist(..).src(..).duration(..).",
+    ],
+    [
+      "sounds",
+      "impl IntoIterator<Item = MixerSound>",
+      "none",
+      "Sounds for the sounds channel: MixerSound::new(id, label).src(..).hotkey(..).accent(..).duration(..).",
+    ],
+    [
+      "mixer",
+      "Entity<MixerStore>",
+      "an internal store",
+      "Gain, mute, solo, monitor and the master.",
+    ],
+    [
+      "meter",
+      "(MixerSourceId, FrameSource<MeterFrame>)",
+      "a demo signal",
+      "The post-fader meter of one channel.",
+    ],
+    ["master_meter", "FrameSource<MeterFrame>", "the demo mix", null],
+    [
+      "devices / devices_loading",
+      "impl IntoIterator<Item = AudioDevice> / bool",
+      "none / false",
+      "Microphones for the device select.",
+    ],
+    [
+      "permission / on_request_permission",
+      "AudioPermission / Fn(&mut Window, &mut App)",
+      "Prompt",
+      null,
+    ],
+    [
+      "device_id / on_device_change",
+      "Option<SharedString>",
+      null,
+      "Optional control of the selected device.",
+    ],
+    [
+      "microphone_status / on_microphone_start / on_microphone_stop",
+      "MicrophoneStatus / Fn(&mut Window, &mut App)",
+      null,
+      "Unset, Start and Stop toggle a local state.",
+    ],
+    [
+      "system_status / system_supported / on_system_change",
+      "SystemAudioStatus / bool / Fn(bool, &mut Window, &mut App)",
+      "Idle / true",
+      "system_supported(false) shows the unsupported notice.",
+    ],
+    [
+      "music_playing / on_music_toggle / track_index / on_next_track",
+      "bool / Fn / usize / Fn",
+      null,
+      "Optional control of the music. Unset, a simulated player drives it.",
+    ],
+    [
+      "sound_playback / on_sound_trigger",
+      "(id, MixerSoundPlayback) pairs / Fn(SharedString, &mut Window, &mut App)",
+      null,
+      "Optional control of the pads. Unset, each pad is a simulated one-shot.",
+    ],
+  ]}
+/>
+
+## Files
+
+The block lives in `src/blocks/system_audio_mixer.rs` of the `audiocn` crate, with its two strips as public parts you can reuse on their own:
+
+- `MixerSourceStrip`: one source with icon, status, meter, fader, mute, solo and monitor (`.title(..)`, `.mixer(..)`, `.meter(..)`, `.status(..)`, `.actions(..)`, `.notice(..)`, `.monitorable(..)`).
+- `MixerMasterStrip`: the master meter, clip count, fader and mute (`.mixer(..)`, `.meter(..)`).
+
+To change more than the builder options allow, copy the file into your app, rename the `crate::` paths to `audiocn::`, and edit it. It uses only the crate's public API.

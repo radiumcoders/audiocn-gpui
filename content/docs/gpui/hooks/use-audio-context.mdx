@@ -1,0 +1,93 @@
+---
+title: AudioOutput
+description: One shared output stream on the default device, the native AudioContext every audiocn::io type plays through.
+seoDescription: AudioOutput is audiocn's native AudioContext for GPUI, behind the device feature. One shared cpal output stream that players, sounds, gain nodes and the mixer play through.
+---
+
+Every `audiocn::io` type that makes sound plays through one shared output on the default device, the native counterpart of the browser's `AudioContext`. It opens the first time something plays. There is no autoplay policy natively, so nothing waits for a user gesture.
+
+```bash
+cargo add audiocn --features device
+```
+
+## Usage
+
+```rust
+use audiocn::io::AudioOutput;
+use audiocn::io::context::shared_output_status;
+
+let status = shared_output_status(); // Suspended until something opens the output
+
+match AudioOutput::shared() {
+    Ok(output) => output.play(my_source),
+    Err(error) => self.error = Some(error.to_string()), // no output device
+}
+```
+
+`AudioOutput::shared()` opens the output, or returns it when it is already open. `shared_output_status()` reads the status without opening anything: `Suspended` before the output opens, `Running` while it plays, `Closed` when the device went away. The engine renders stereo `f32` at the device's sample rate and maps it onto the device's channels. Anything that implements `AudioSource` can play: render into the buffer from the audio thread, and never block or touch GPUI there.
+
+## Your own context
+
+React's `AudioContextProvider` makes every hook use a context you created. Here, open an output on a device of your choice with `AudioOutput::open(Some(device_id))` and route sources to it by passing `Destination::Bus(output.destination())` where an option takes a destination. Everything else keeps using the shared output.
+
+```rust
+let output = AudioOutput::open(Some(&device_id))?;
+
+let sound = Sound::new(
+    "/sounds/ding.wav",
+    SoundOptions { destination: Destination::Bus(output.destination()), ..Default::default() },
+);
+```
+
+Components that only sometimes play, such as a knob's click, never open the output themselves. Give them a `KnobClickPlayer` with `cx.set_global(..)`, or play clicks with `audiocn::io::play_click`, which uses the shared output.
+
+## Returns
+
+`AudioOutput` methods. Clones share the stream, which stops when the last clone drops.
+
+<PropsTable
+  rows={[
+    [
+      "shared",
+      "() -> Result<AudioOutput>",
+      null,
+      "The app-wide output on the default device, opened on first use. Reopens after the device went away.",
+    ],
+    [
+      "open",
+      "(device_id: Option<&str>) -> Result<AudioOutput>",
+      null,
+      "An output on a device; None for the system default.",
+    ],
+    [
+      "status",
+      "() -> AudioContextStatus",
+      null,
+      "Running, or Closed when the device went away.",
+    ],
+    [
+      "destination",
+      "() -> Bus",
+      null,
+      "Where sources play: context.destination.",
+    ],
+    [
+      "play",
+      "(source: impl AudioSource)",
+      null,
+      "Connects a source to the output.",
+    ],
+    [
+      "sample_rate / channels / device_name",
+      "u32 / u16 / &str",
+      null,
+      "The device's format and name.",
+    ],
+    [
+      "current_time",
+      "() -> f64",
+      null,
+      "Seconds rendered so far: context.currentTime.",
+    ],
+  ]}
+/>

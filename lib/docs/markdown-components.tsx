@@ -1,6 +1,7 @@
 import { asMarkdown, md } from "fumadocs-core/server";
 import type { ReactNode } from "react";
 
+import { gpuiDemoPath, readGpuiExample } from "@/lib/docs/gpui-source";
 import { readSource } from "@/lib/docs/read-source";
 
 /**
@@ -50,6 +51,29 @@ const ComponentSource = async ({
   asMarkdown();
   const lang = path.endsWith(".css") ? "css" : "tsx";
   return fence(lang, await readSource(path), title ?? path);
+};
+
+const GpuiExample = async ({
+  code: rust,
+  demo,
+  variant,
+}: {
+  code?: string;
+  demo: string;
+  variant?: string;
+}) => {
+  asMarkdown();
+  return fence(
+    "rust",
+    rust ?? (await readGpuiExample(demo, variant)),
+    gpuiDemoPath(demo)
+  );
+};
+
+/** The live demo has no Markdown form; its code is in `GpuiExample`. */
+const GpuiPreview = () => {
+  asMarkdown();
+  return "";
 };
 
 /** The `command` prop is already the npm/npx form the remark plugin extracted. */
@@ -110,6 +134,8 @@ export const markdownComponents = {
   Callout,
   ComponentPreview,
   ComponentSource,
+  GpuiExample,
+  GpuiPreview,
   InstallCommand,
   PropsTable,
   Step: Passthrough,

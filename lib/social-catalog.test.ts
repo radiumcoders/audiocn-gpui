@@ -8,7 +8,7 @@ import { componentPreviews, getSocialCards } from "@/lib/social-catalog";
 import socialImages from "@/lib/social-images.json";
 import type { SocialImage } from "@/lib/social-metadata";
 
-import { docsPages, publicPages } from "../e2e/routes";
+import { docsPages, socialPages } from "../e2e/routes";
 
 const images: Record<string, SocialImage | undefined> = socialImages;
 const socialCards = getSocialCards(
@@ -17,7 +17,7 @@ const socialCards = getSocialCards(
 
 describe("social image assets", () => {
   it("covers every public page and gives each component its own preview", () => {
-    expect(Object.keys(images).toSorted()).toEqual(publicPages.toSorted());
+    expect(Object.keys(images).toSorted()).toEqual(socialPages.toSorted());
     for (const pathname of docsPages.filter((url) =>
       url.startsWith("/docs/components/")
     )) {

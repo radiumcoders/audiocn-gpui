@@ -1,0 +1,110 @@
+---
+title: Theming
+description: audiocn uses your shadcn theme, plus six audio tokens you can change like any other, held in one GPUI global.
+seoDescription: Theme audiocn's GPUI components with audiocn::Theme, a GPUI global holding shadcn/ui's tokens and audiocn's audio tokens. Read any shadcn theme's CSS with Theme::apply_css.
+---
+
+## Your theme applies
+
+Components paint with `audiocn::Theme`, a GPUI global that holds the standard shadcn tokens under the same names in snake_case: `background`, `foreground`, `muted`, `primary`, `border`, `ring`, `destructive` and the rest. `Theme::light()` and `Theme::dark()` are audiocn.dev's stone theme. Set one with `set_theme`, which also refreshes every window:
+
+```rust
+use audiocn::theme::{Theme, set_theme};
+
+set_theme(Theme::dark(), cx);
+```
+
+`Theme::apply_css` reads any shadcn theme or preset. Pass it one block of CSS, such as the `:root { … }` or `.dark { … }` of your `globals.css`. Every `--name: value;` whose name matches a field overrides it. Values can be `oklch(…)`, hex colours or `var(--other)`, and `--radius` in `rem` or `px`:
+
+```rust
+let mut theme = Theme::dark();
+theme.apply_css(include_str!("theme-dark.css"));
+set_theme(theme, cx);
+```
+
+Read the theme in your own elements with `ActiveTheme`:
+
+```rust
+use audiocn::ActiveTheme;
+
+div().bg(cx.theme().muted).text_color(cx.theme().muted_foreground)
+```
+
+## Audio tokens
+
+Six tokens cover meanings shadcn has no token for. They are fields of `Theme`, and `apply_css` reads them by their CSS names:
+
+| Field | CSS variable | Default | Used for |
+| --- | --- | --- | --- |
+| `meter_ok` | `--meter-ok` | green | Normal level zone |
+| `meter_warn` | `--meter-warn` | amber | Warning zone |
+| `meter_clip` | `--meter-clip` | `destructive` | Clip zone and clip light |
+| `channel_mute` | `--channel-mute` | `destructive` | Pressed mute toggle |
+| `channel_solo` | `--channel-solo` | amber | Pressed solo toggle |
+| `channel_monitor` | `--channel-monitor` | blue | Pressed monitor toggle |
+
+Each accent also has a `_foreground` field for text: `meter_ok_foreground`, `meter_warn_foreground`, `meter_clip_foreground`, `channel_mute_foreground`, `channel_solo_foreground` and `channel_monitor_foreground`. In light mode these are darker than the meter accents; in dark mode they follow the accent. This keeps small labels readable without dimming the meters.
+
+Change them like any other field, or in the CSS you pass to `apply_css`. If the CSS changes `--destructive` but not `--meter-clip` or `--channel-mute`, those follow it.
+
+```rust
+use audiocn::theme::oklch;
+
+let mut theme = Theme::light();
+theme.meter_ok = oklch(0.72, 0.12, 200.);
+```
+
+## Component variables
+
+The React components read their geometry and drawing colours from CSS variables. Here they are builder options, and canvas components draw in the text colour, so `.text_color(..)` replaces the `text-*` classes:
+
+```rust
+LevelMeter::new("mic").size(AudioSize::Sm).zone_color(MeterZoneName::Ok, cx.theme().primary)
+LiveWaveform::new("wave").text_color(cx.theme().primary)
+BarVisualizer::new("bars").text_color(cx.theme().primary).bar_width(px(4.))
+```
+
+Components read the theme every time they paint, so switching between light and dark repaints them without losing their state.
+
+## Data attributes
+
+GPUI has no data attributes. You pass the state in, so style with the same value. Components that are `Styled` take GPUI's style methods:
+
+```rust
+ChannelStrip::new("mic")
+    .muted(muted)
+    .when(muted, |strip| strip.opacity(0.6))
+```
+
+Where the component owns the state, it hands it to a callback. `DbReadout::decorate` gets what the readout shows, including its zone, React's `data-zone`:
+
+```rust
+let clip = cx.theme().meter_clip_foreground;
+
+DbReadout::new("level")
+    .source(meter.clone())
+    .decorate(move |display, text| {
+        text.when(display.zone == MeterZoneName::Clip, |text| text.text_color(clip))
+            .into_any_element()
+    })
+```
+
+Each component page lists its options.
+
+## Live values in CSS
+
+There is no CSS to write live values to. Instead, any element rendered inside a `LevelMeter` can read the live level with `use_level_meter`: `channel_reading()` gives the smoothed level, RMS and peak hold, 0..1, and the zone. See [Build your own visual](/docs/gpui/components/level-meter#build-your-own-visual).
+
+```rust
+#[derive(IntoElement)]
+struct Glow;
+
+impl RenderOnce for Glow {
+    fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
+        let level = use_level_meter("Glow").channel_reading().level;
+        div().size(px(24.)).rounded_full().bg(cx.theme().meter_ok.opacity(level))
+    }
+}
+
+LevelMeter::new("glow").source(meter.clone()).child(Glow)
+```

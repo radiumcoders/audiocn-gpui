@@ -1,0 +1,27 @@
+---
+title: prefers_reduced_motion
+description: True when your app says the user asked to reduce motion.
+seoDescription: prefers_reduced_motion and set_reduced_motion control reduced motion for audiocn's GPUI meters and visualizers, which then show a static level instead of animating.
+---
+
+Meters and visualizers use this to show a static level instead of animating.
+
+```bash
+cargo add audiocn
+```
+
+```rust
+use audiocn::signal::reduced_motion::prefers_reduced_motion;
+
+let reduced_motion = prefers_reduced_motion(cx);
+```
+
+Browsers have a `prefers-reduced-motion` query; GPUI has none. So the preference is a global your app sets, from the system's accessibility setting or its own preferences. It is `false` until you set it:
+
+```rust
+use audiocn::signal::reduced_motion::set_reduced_motion;
+
+set_reduced_motion(true, cx);
+```
+
+`set_reduced_motion` refreshes every window, so components switch at once.

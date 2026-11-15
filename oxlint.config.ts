@@ -52,6 +52,10 @@ export default defineConfig({
     ".claude/**",
     ".source/**",
     "public/r/**",
+    // The Rust port: checked by its own CI (cargo fmt, clippy); its scripts are dev tools.
+    "gpui/**",
+    // Built by `pnpm gpui:build`.
+    "public/gpui/**",
   ],
   jsPlugins: shadcn.jsPlugins,
   overrides: [

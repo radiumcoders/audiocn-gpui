@@ -44,10 +44,10 @@ Copy, paste, make them yours.</p>
 
 ## GPUI (Rust)
 
-Every component and block is also available for [GPUI](https://gpui.rs), Zed's Rust UI framework, in [`gpui/`](./gpui): the same names, props, visuals and keyboard behaviour, with a native and in-browser gallery of every docs example. See [`gpui/README.md`](./gpui/README.md).
+Every component and block is also available for [GPUI](https://gpui.rs), Zed's Rust UI framework, in [`gpui/`](./gpui): the same names, props, visuals and keyboard behaviour, with a native and in-browser gallery of every docs example. Docs: [audiocn.dev/docs/gpui](https://audiocn.dev/docs/gpui) (the React | GPUI switch in the docs sidebar), and [`gpui/README.md`](./gpui/README.md).
 
 ```sh
-cargo add audiocn --git https://github.com/radiumcoders/audiocn-gpui
+cargo add audiocn
 ```
 
 ## Components

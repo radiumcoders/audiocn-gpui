@@ -1,0 +1,80 @@
+---
+title: Using your own audio engine
+description: Drive audiocn from your own audio thread, a server, a plugin host or anything else.
+seoDescription: Drive audiocn's GPUI components from any Rust audio engine. Push levels with create_frame_emitter from the audio thread and send fader values back from callbacks.
+---
+
+The `device` feature is optional. If your audio runs somewhere else, such as your own cpal stream, a plugin host, a server or another process, use the components and the audio core on their own.
+
+## Levels from anywhere
+
+Wrap your data in a frame source with `create_frame_emitter`:
+
+```rust
+use audiocn::{ChannelLevel, MeterFrame, create_frame_emitter};
+
+let mic_levels = create_frame_emitter::<MeterFrame>();
+let source = mic_levels.source();
+
+backend.on_levels(move |peak_db, rms_db| {
+    mic_levels.emit(MeterFrame::mono(ChannelLevel::with_rms(peak_db, rms_db)));
+});
+```
+
+```rust
+LevelMeter::new("mic").aria_label("Microphone").source(source.clone())
+```
+
+`emit` takes a short lock and never touches GPUI, so call it from any thread. Meters apply their own ballistics, so any update rate works: at 30 updates a second or more they look like a hardware meter, and at one a second they still move smoothly.
+
+## Controls to anywhere
+
+Controls report values; they never touch audio. Send changes to your engine:
+
+```rust
+let (backend, settings) = (self.backend.clone(), self.settings.clone());
+
+Fader::new("mic-gain")
+    .value(self.mic_gain_db)
+    .on_value_change(move |gain_db, _, _| backend.set_gain("mic", gain_db))
+    .on_value_committed(move |gain_db, _, _| settings.save_mic_gain(gain_db))
+```
+
+Use `on_value_change` for live updates and `on_value_committed` for anything slow, such as saving settings.
+
+## Mixer state without Web Audio
+
+[`use_mixer`](/docs/gpui/hooks/use-mixer) holds gain, mute, solo, pan and monitor for every channel and knows which channels are audible. Send its state to your engine after each change:
+
+```rust
+let mixer = use_mixer("mixer", MixerOptions { channels, ..Default::default() }, window, cx);
+
+mixer.update(cx, |mixer, cx| {
+    if mixer.set_gain("mic", gain_db) {
+        backend.apply_mixer(&mixer.state);
+        cx.notify();
+    }
+});
+```
+
+## Devices from anywhere
+
+[`AudioDeviceSelect`](/docs/gpui/components/audio-device-select) takes its devices as a list of `AudioDevice`, including their status, so a device list from your engine works the same as the one from `audiocn::io`.
+
+```rust
+AudioDeviceSelect::new("input", backend.inputs().map(|d| AudioDevice::new(d.id, d.name)))
+```
+
+## Swapping sources
+
+If the audio behind a meter restarts, keep the same emitter and emit into it from the new session. Components hold the `FrameSource`, so they never notice the swap:
+
+```rust
+let levels = create_frame_emitter::<MeterFrame>();
+
+// on every new session:
+let sink = levels.clone();
+session.on_levels(move |frame| sink.emit(frame));
+```
+
+React's `createFrameRelay` has no port: an emitter is already a slot you can write to from anywhere. Call `clear()` when a session ends, and meters fall to silence.

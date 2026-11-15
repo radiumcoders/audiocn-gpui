@@ -1,0 +1,63 @@
+---
+title: GainNode
+description: A gain stage on the shared output, wired from an input to a destination, with click-free level changes.
+seoDescription: GainNode is audiocn's native gain stage for GPUI, behind the device feature. Route a microphone or any source through a ramped gain to the speakers or a mixer bus.
+---
+
+The blocks use a gain stage for every level control and bus: the microphone gain in Mic Setup, the soundboard's master bus, and the output of a `Sound`.
+
+```bash
+cargo add audiocn --features device
+```
+
+## Usage
+
+```rust
+use audiocn::audio::decibels::db_to_gain;
+use audiocn::io::{AudioInput, GainNode, GainNodeOptions, MicrophoneOptions, use_microphone};
+
+let microphone = use_microphone("mic", MicrophoneOptions { enabled: true, ..Default::default() }, window, cx);
+
+// The microphone, through a gain stage, to the speakers.
+if self.monitor.is_none() && let Some(handle) = microphone.handle.clone() {
+    self.monitor = GainNode::new(GainNodeOptions {
+        input: Some(AudioInput::Microphone(handle)),
+        gain: db_to_gain(self.gain_db),
+        ..Default::default()
+    })
+    .ok();
+}
+
+// When the level changes:
+if let Some(node) = &self.monitor {
+    node.set_gain(db_to_gain(gain_db));
+}
+```
+
+React's `useGainNode` builds and tears down the node with the component. A `GainNode` is a plain value: keep it in your view, and it disconnects when you drop it.
+
+## Routing
+
+- `input` takes an `AudioInput`: a microphone handle, a `Bus`, or any `AudioSource`. Leave it out to feed the node yourself through `node.input()` or `node.connect(..)`.
+- `destination` is where the node plays. Leave it at `Destination::Speakers`, pass `Destination::None` to route it yourself with `take_output()`, or pass `Destination::Bus(bus)`, such as a mixer channel's `input_bus`.
+- `input()` returns the node's input bus, so you can connect more to it.
+
+## Levels
+
+`gain` is linear: use `db_to_gain` from `audiocn::audio::decibels` for decibels. Changes ramp with a short time constant (`time_constant`, default 10 ms), so they never click. A new node starts at its gain instead of ramping up from unity, so a muted node is never heard as it starts.
+
+The node disconnects when it is dropped, or when you call `disconnect()`.
+
+<PropsTable
+  rows={[
+    ["input", "Option<AudioInput>", null, "What feeds the node."],
+    ["gain", "f32", "1.", "Linear gain."],
+    [
+      "destination",
+      "Destination",
+      "Speakers",
+      "Where the node plays; Destination::None routes nowhere.",
+    ],
+    ["time_constant", "f32", "0.01", "Ramp time constant, in seconds."],
+  ]}
+/>

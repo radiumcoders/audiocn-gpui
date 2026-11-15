@@ -1,0 +1,152 @@
+---
+title: Audio Device Select
+description: A microphone, speaker or source picker with permission, loading and disconnected states, for GPUI.
+seoDescription: A microphone, speaker or source picker for GPUI apps in Rust, with permission, loading and disconnected states and native device lists through cpal. The audiocn Audio Device Select for Zed's UI framework.
+---
+
+<GpuiExample demo="audio-device-select" eager />
+
+## Installation
+
+```bash
+cargo add audiocn
+```
+
+The select itself needs no audio backend. To list the system's real devices with `audiocn::io::use_audio_devices`, enable the `device` feature:
+
+```bash
+cargo add audiocn --features device
+```
+
+## Usage
+
+```rust
+use audiocn::{AudioDeviceKind, AudioDeviceSelect};
+use audiocn::io::use_audio_devices;
+```
+
+```rust
+let devices = use_audio_devices("mic-devices", AudioDeviceKind::AudioInput, window, cx);
+let refresh = devices.clone();
+let view = cx.entity();
+
+AudioDeviceSelect::new("mic", devices.devices.clone())
+    .loading(devices.is_loading)
+    .permission(devices.permission)
+    .on_request_permission(move |_, _| {
+        refresh.request_permission();
+    })
+    .on_value_change(move |id, _, cx| {
+        view.update(cx, |this, cx| {
+            this.device_id = id;
+            cx.notify();
+        })
+    })
+    .value(self.device_id.clone())
+```
+
+Devices come in as data, so the select works with [`use_audio_devices`](/docs/gpui/hooks/use-audio-devices) or with any device list. Build your own with `AudioDevice::new(id, label)` and `.with_default(..)`, `.with_status(..)`, `.with_description(..)`. Native backends need no microphone permission, so `use_audio_devices` always reports `AudioPermission::Granted`; the permission states are there for lists that do.
+
+## Anatomy
+
+```rust
+div()
+    .child(
+        AudioDeviceSelect::new("mic", devices)
+            .trigger(
+                AudioDeviceSelectTrigger::new()
+                    .child(AudioDeviceSelectValue::new().placeholder("Select a microphone")),
+            )
+            .content(AudioDeviceSelectContent::new()),
+    )
+    .child(
+        AudioDeviceSelectPreview::new()
+            .child(LiveWaveform::new("mic-preview").source(microphone.visual.clone())),
+    )
+```
+
+The trigger and the popup are set with `.trigger(..)` and `.content(..)`; leave them out for the defaults above. `AudioDeviceSelectPreview` is a framed area that sits next to the select, not inside it. `AudioDeviceSelectContent` renders one item per device. Pass children to render items yourself with `AudioDeviceSelectItem`:
+
+```rust
+AudioDeviceSelectContent::new().child(AudioDeviceSelectItem::new("usb").device(usb_mic))
+```
+
+Custom content does not get the permission notice for free. Add an `AudioDeviceSelectPermission` with `.permission(..)` and `.on_request_permission(..)` if you need it.
+
+## Examples
+
+### States
+
+Selected device, a "None" option, a device that was unplugged, and loading.
+
+<GpuiExample demo="audio-device-select" variant="states" />
+
+## Behaviour
+
+- A selected device that disappears is kept and shown as "(disconnected)", so the selection is never lost silently. The select remembers the labels of devices it has listed; a device it never saw shows as "Unknown device".
+- Devices with `status` `AudioDeviceStatus::Unavailable` or `AudioDeviceStatus::PermissionRequired` are disabled.
+- The default device is marked.
+
+## Theming
+
+GPUI has no data attributes. The states are builder options, and the select paints with the active `audiocn::Theme`:
+
+| React | GPUI | Meaning |
+| --- | --- | --- |
+| `data-loading` | `.loading(true)` | Devices are loading |
+| `data-permission` | `.permission(AudioPermission::..)` | `Granted`, `Prompt` or `Denied` (`Unsupported` reads as `Denied`) |
+| `data-missing` | none | The selected device is gone. It shows as "(disconnected)", with no styling hook |
+
+## API reference
+
+<PropsTable
+  rows={[
+    [
+      "new",
+      "(id: impl Into<ElementId>, devices: impl IntoIterator<Item = AudioDevice>)",
+      null,
+      "AudioDevice { id, label, kind, group_id, is_default, status, description }.",
+    ],
+    [
+      "value",
+      "Option<SharedString>",
+      null,
+      "The device id. None is no selection, or None with allow_none.",
+    ],
+    ["default_value", "impl Into<SharedString>", "no selection", null],
+    [
+      "on_value_change",
+      "Fn(Option<SharedString>, &mut Window, &mut App)",
+      null,
+      null,
+    ],
+    ["allow_none", "bool", "false", "Adds a None item."],
+    ["none_label", "impl Into<SharedString>", '"None"', null],
+    ["loading", "bool", "false", 'Shows "Finding devices…".'],
+    [
+      "permission",
+      "AudioPermission",
+      "Granted",
+      "Granted, Prompt, Denied or Unsupported.",
+    ],
+    [
+      "on_request_permission",
+      "Fn(&mut Window, &mut App)",
+      null,
+      'Shows an "Allow access" button while permission is Prompt.',
+    ],
+    ["disabled", "bool", "false", null],
+    [
+      "trigger",
+      "AudioDeviceSelectTrigger",
+      "a trigger with an AudioDeviceSelectValue",
+      null,
+    ],
+    [
+      "content",
+      "AudioDeviceSelectContent",
+      "AudioDeviceSelectContent::new()",
+      null,
+    ],
+  ]}
+/>

@@ -1,0 +1,26 @@
+---
+title: Introduction
+description: Audio components for GPUI, ported one-to-one from audiocn for React.
+seoDescription: audiocn for GPUI is a Rust crate of audio UI components for Zed's UI framework, with level meters, visualizers, faders, knobs, channel strips, a mixer, players and sound pads.
+---
+
+audiocn for GPUI is a set of audio components for [GPUI](https://gpui.rs), Zed's Rust UI framework: level meters, visualizers, faders, channel strips, a complete mixer, players and sound pads.
+
+It is a one-to-one port of audiocn for React, in a crate you add with Cargo. Every component, block and docs example has the same name, the same options and defaults, the same look and the same keyboard behaviour. Where GPUI can't express something the React version does, the component page says so.
+
+## What makes it different
+
+- **Themed by shadcn.** `audiocn::Theme` holds shadcn/ui's tokens and audiocn's audio tokens under the same names, and reads any shadcn theme's CSS. Any shadcn theme restyles audiocn in GPUI too.
+- **Fast by default.** Meters and visualizers read their frames while painting and only request animation frames while something moves, so a mixer with many channels stays smooth and an idle one costs nothing.
+- **Bring your own audio.** Components receive levels and values; they never open a microphone themselves. Use the native audio module behind the `device` feature, or feed them from any other engine.
+- **Real units.** Mixer components speak decibels, the way audio engineers do.
+
+## How it maps from React
+
+- **Components are builders.** `<LevelMeter source={src} />` becomes `LevelMeter::new(id).source(src)`. Props are snake_case builder methods with the React defaults, and callbacks take `(value, &mut Window, &mut App)`.
+- **State lives under an id.** Interactive components keep their state in GPUI's keyed element state, so give each one an id that is unique among its siblings. Controlled (`.value(v)`) and uncontrolled (`.default_value(v)`) both work, as in React.
+- **CSS variables become a `Theme`.** Set the theme once with `audiocn::theme::set_theme(theme, cx)`. Component variables and data attributes become builder options. See [Theming](/docs/gpui/concepts/theming).
+- **Frame sources are shared slots.** A `FrameSource` is a cheap, thread-safe handle to the latest frame. Push frames from any thread with `create_frame_emitter()`. See [Feeding data](/docs/gpui/concepts/feeding-data).
+- **Context becomes explicit config.** React's `AudioConfigProvider` becomes `AudioConfig`, passed with `.config(..)`. `ChannelStrip` and `Mixer` hand the right config to their children.
+- **Hooks become `use_*` functions and plain state.** `useDemoSignal` is `use_demo_signal(id, options, window, cx)`, called from `render`. Hooks that only hold logic, such as `useClipHold`, are plain Rust types you can use anywhere.
+- **Web Audio becomes the `device` feature.** `audiocn::io` opens microphones, system audio, devices, players, sounds and a mixer natively, on cpal, rustfft and symphonia.

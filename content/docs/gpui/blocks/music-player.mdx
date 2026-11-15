@@ -1,0 +1,118 @@
+---
+title: Music Player
+description: A playlist player with a waveform seek bar, shuffle, repeat and ducking under the microphone, as a GPUI block.
+seoDescription: A music player block for GPUI apps in Rust, with a playlist, waveform seek bar, shuffle, repeat and ducking under the microphone. Play files natively with the audiocn device feature.
+---
+
+<GpuiExample demo="music-player" eager />
+
+## Installation
+
+```bash
+cargo add audiocn
+```
+
+The block is part of the crate: `audiocn::MusicPlayer`. To play files natively, add the `device` feature:
+
+```bash
+cargo add audiocn --features device
+```
+
+## What it does
+
+- A player with a [waveform](/docs/gpui/components/waveform) seek bar that shows what has played, hover time, and elapsed and remaining time.
+- A [track list](/docs/gpui/components/track-list): select a track to play it; the list advances on its own.
+- Shuffle, repeat all and repeat one.
+- With a `ducking_source`, the music drops while the source is active, with an on/off switch and an amount. It comes back on its own when the source goes quiet or stops.
+
+The block opens no device. Without `.player(..)` it plays each track on a simulated player of the track's `duration`, with no sound; the previews work this way. For real playback, pass an `AudioPlayerEngine` from `audiocn::io::use_audio_player`, and load the new track in `on_track_change`. The block then calls `play` when the change should start on its own:
+
+```rust
+use audiocn::io::use_audio_player;
+use audiocn::{MusicPlayer, MusicTrack, UseAudioPlayerOptions};
+
+let player = use_audio_player("music/engine", UseAudioPlayerOptions::src(self.src.clone()), window, cx);
+let (engine, view) = (player.clone(), cx.entity());
+
+MusicPlayer::new("music")
+    .tracks(vec![
+        MusicTrack::new("intro", "Intro", "/music/intro.mp3").artist("audiocn"),
+        MusicTrack::new("outro", "Outro", "/music/outro.mp3").artist("audiocn"),
+    ])
+    .player(player)
+    .on_track_change(move |track, _, cx| {
+        if engine.read(cx).src() != Some(&track.src) {
+            let src = track.src.clone();
+            engine.update(cx, |engine, cx| engine.load(Some(src.clone()), cx));
+            view.update(cx, |this, _| this.src = src);
+        }
+    })
+```
+
+The seek bar draws `MusicTrack::peaks`. Compute them from the decoded file with `audiocn::signal::waveform_data::compute_peaks(buffer.channels(), 400)`, where `buffer` is `audiocn::io::AudioBuffer::load_cached(src)?`. `MusicTrack::duration` shows the length before the file has loaded.
+
+## Ducking under the microphone
+
+<GpuiExample demo="music-player" variant="ducking" />
+
+The block measures the duck: while the source peaks at −35 dB or above and the switch is on, the gain falls to the amount (−12 dB by default) in 20 ms, holds 200 ms, then comes back. There is no audio graph in the block, so `on_duck_gain` reports that gain (1 at unity) for you to apply after the player's own volume, for example on the bus the engine plays into with `set_destination(Destination::Bus(..))`.
+
+```rust
+MusicPlayer::new("music")
+    .tracks(tracks)
+    .ducking_source(mic.meter.clone())
+    .on_duck_gain(move |gain, _, _| music_bus.set_gain(gain))
+```
+
+## Props
+
+<PropsTable
+  rows={[
+    [
+      "new",
+      "(id: impl Into<ElementId>)",
+      null,
+      "Keeps the playlist position, shuffle, repeat and ducking settings between renders.",
+    ],
+    [
+      "tracks / default_tracks",
+      "Vec<MusicTrack>",
+      "vec![]",
+      "MusicTrack::new(id, title, src) with .artist(..), .artwork(..), .duration(..) and .peaks(..).",
+    ],
+    [
+      "on_track_change",
+      "Fn(&MusicTrack, &mut Window, &mut App)",
+      null,
+      "Load the track here when you pass a player.",
+    ],
+    [
+      "player",
+      "impl AudioPlayerController",
+      "a simulated player",
+      "The playback engine. player_rc takes an Rc<dyn AudioPlayerController>.",
+    ],
+    [
+      "ducking_source",
+      "impl Into<Option<FrameSource<MeterFrame>>>",
+      null,
+      "The signal that ducks the music, usually the microphone. None shows the controls with nothing to follow.",
+    ],
+    [
+      "on_duck_gain",
+      "Fn(f32, &mut Window, &mut App)",
+      null,
+      "The linear duck gain to apply after the player.",
+    ],
+    [
+      "output",
+      "Option<MusicOutput>",
+      "speakers",
+      "Marks the music as routed into a mixer. The block does not connect it; route the engine with set_destination.",
+    ],
+  ]}
+/>
+
+## Files
+
+The block lives in `src/blocks/music_player.rs` of the `audiocn` crate. To change more than the builder options allow, copy the file into your app, rename the `crate::` paths to `audiocn::`, and edit it. Two imports are private to the crate: `radius_lg(theme)`, which is `theme.radius`, and `radius_xl(theme)`, which is `theme.radius * 1.4`. Inline them.

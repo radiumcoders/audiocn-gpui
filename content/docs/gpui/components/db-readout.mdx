@@ -1,0 +1,97 @@
+---
+title: dB Readout
+description: A numeric level label that updates at a readable rate and never shifts the layout, in GPUI.
+seoDescription: A dB level readout for GPUI apps in Rust that updates at a readable rate, holds peaks and reserves its width so the layout never shifts. The audiocn dB Readout for Zed's UI framework.
+---
+
+<GpuiExample demo="db-readout" eager />
+
+## Installation
+
+```bash
+cargo add audiocn
+```
+
+## Usage
+
+```rust
+use audiocn::DbReadout;
+```
+
+```rust
+DbReadout::new("peak").source(meter.clone())
+```
+
+`DbReadout::new` takes an element id, which keeps the readout's ticker between renders. With a `source`, the readout updates its own text four times a second from a GPUI task, and re-renders only when the text changes. Its width is reserved for the longest value, so the text never pushes neighbouring elements around.
+
+## Examples
+
+### Color by zone
+
+React styles the readout with `data-zone` and `data-silent`. Here `.decorate(..)` hands you a `DbReadoutDisplay` with the current `zone` and `silent` flag, and the styled text element, so you can restyle or wrap it:
+
+```rust
+DbReadout::new("level")
+    .source(meter.clone())
+    .decorate(move |display, el| match display.zone {
+        MeterZoneName::Clip => el.text_color(clip).into_any_element(),
+        MeterZoneName::Warn => el.text_color(warn).into_any_element(),
+        MeterZoneName::Ok => el.into_any_element(),
+    })
+```
+
+<GpuiExample demo="db-readout" variant="zones" />
+
+## Theming
+
+| React | GPUI |
+| --- | --- |
+| `data-zone` | `DbReadoutDisplay::zone`: `Ok`, `Warn` or `Clip` |
+| `data-silent` | `DbReadoutDisplay::silent`: the level is at or below `floor_db` |
+
+The readout is `Styled`, so text size, weight and colour are set with the usual GPUI style methods.
+
+## API reference
+
+<PropsTable
+  rows={[
+    [
+      "new",
+      "(id: impl Into<ElementId>)",
+      null,
+      "Keeps the ticker between renders.",
+    ],
+    ["value", "f32", null, "A level in dB, for declarative use."],
+    [
+      "source",
+      "impl Into<Option<FrameSource<MeterFrame>>>",
+      null,
+      "Updates the text at its interval.",
+    ],
+    ["measure", "DbReadoutMeasure", "Peak", "Peak or Rms."],
+    [
+      "channel",
+      "impl Into<DbReadoutChannel>",
+      "DbReadoutChannel::Max",
+      "A channel index, or the loudest channel.",
+    ],
+    ["interval_ms", "f64", "250.", "How often the text changes."],
+    ["hold_ms", "f64", "0.", "Show the highest value within this window."],
+    ["decimals", "usize", "1", null],
+    ["unit", "bool", "true", 'Append " dB".'],
+    ["floor_db", "f32", "-60.", 'At or below this, show "−∞".'],
+    [
+      "zones",
+      "impl Into<Vec<MeterZone>>",
+      "DEFAULT_ZONES",
+      "Zones used for DbReadoutDisplay::zone.",
+    ],
+    ["format", "Fn(f32) -> SharedString", null, "Replaces all formatting."],
+    [
+      "decorate",
+      "Fn(&DbReadoutDisplay, Div) -> AnyElement",
+      null,
+      "Restyles or wraps the text by what it shows.",
+    ],
+  ]}
+/>

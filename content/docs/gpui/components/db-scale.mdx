@@ -1,0 +1,119 @@
+---
+title: dB Scale
+description: Tick marks and labels for a decibel range, shared by meters and faders, painted by GPUI.
+seoDescription: A decibel scale for GPUI apps in Rust, with tick marks and labels that line up with meters and faders and thin themselves on narrow layouts. The audiocn dB Scale for Zed's UI framework.
+---
+
+<GpuiExample demo="db-scale" eager />
+
+## Installation
+
+```bash
+cargo add audiocn
+```
+
+## Usage
+
+```rust
+use audiocn::DbScale;
+```
+
+```rust
+DbScale::new().min_db(-60.).max_db(6.)
+```
+
+Inside a `LevelMeter` or `Fader`, use `LevelMeterScale` or `FaderScale` instead: they take the range, orientation and taper from their parent so the ticks line up.
+
+## Anatomy
+
+```rust
+use audiocn::{DbScale, DbScaleTick};
+
+DbScale::new()
+    .child(DbScaleTick::new(0.))
+    .child(DbScaleTick::new(-12.))
+```
+
+With no children, the scale renders ticks from `.ticks(..)`, or common values inside the range. Labels that would touch a more important one are hidden on every paint, so a narrow scale stays readable and a resize re-thins it.
+
+## Examples
+
+### Vertical, with custom ticks
+
+<GpuiExample demo="db-scale" variant="vertical" />
+
+## Theming
+
+The scale paints with the active `audiocn::Theme`: marks use `Theme::border` and labels `Theme::muted_foreground`. Restyle the labels with `.text_color(..)` and `.text_size(..)` on the scale.
+
+The React data attributes map to builder options:
+
+| React                                  | GPUI                            |
+| -------------------------------------- | ------------------------------- |
+| `data-orientation`, `data-side`        | `.orientation(..)`, `.side(..)` |
+| `data-major`                           | `DbScaleTick::major(..)`        |
+| `[&_[data-slot=db-scale-mark]]:hidden` | `.marks(false)`                 |
+
+## Accessibility
+
+The scale is decorative and adds nothing to the accessibility tree: the meter or fader it belongs to already reports its value.
+
+## API reference
+
+### DbScale
+
+<PropsTable
+  rows={[
+    ["min_db", "f32", "-60.", "Bottom of the range, or the config's range."],
+    ["max_db", "f32", "0.", "Top of the range."],
+    [
+      "ticks",
+      "impl IntoIterator<Item = f32>",
+      null,
+      "Tick values. Default: common values inside the range.",
+    ],
+    [
+      "taper",
+      "impl Into<TaperInput>",
+      "TaperInput::Linear",
+      "Position law, so ticks line up with a fader.",
+    ],
+    ["orientation", "Orientation", "Horizontal", null],
+    [
+      "side",
+      "DbScaleSide",
+      "End",
+      "Which side of the marks the labels sit on: Start or End.",
+    ],
+    ["labels", "bool", "true", "Show labels."],
+    ["marks", "bool", "true", "Draw the tick marks."],
+    [
+      "format",
+      "Fn(f32) -> SharedString",
+      "default_db_scale_format",
+      'Label text. Default: "+6", "0", "−12".',
+    ],
+    [
+      "config",
+      "AudioConfig",
+      null,
+      "Range and orientation from a surrounding meter, strip or mixer.",
+    ],
+    [
+      "child / children",
+      "DbScaleTick",
+      null,
+      "Custom ticks replace the default ones.",
+    ],
+  ]}
+/>
+
+### DbScaleTick
+
+<PropsTable
+  rows={[
+    ["new", "(value: f32)", null, "Position in dB."],
+    ["major", "bool", "true", "Major ticks have longer marks."],
+    ["label", "impl Into<SharedString>", null, "Replaces the label."],
+  ]}
+/>

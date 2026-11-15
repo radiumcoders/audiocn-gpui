@@ -20,3 +20,7 @@ export const docsPages = collectPages(
   path.join(process.cwd(), "content/docs")
 ).toSorted();
 export const publicPages = ["/", "/contributors", ...docsPages];
+/** Pages with their own social image; GPUI pages reuse their React twin's. */
+export const socialPages = publicPages.filter(
+  (url) => !url.startsWith("/docs/gpui")
+);

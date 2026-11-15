@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { twinPath } from "@/lib/docs/framework";
 import { siteConfig } from "@/lib/site";
 import socialImages from "@/lib/social-images.json";
 
@@ -22,7 +23,10 @@ export const getPageMetadata = ({
   title,
   pathname,
   description = siteConfig.description,
-  image = images[pathname] ?? defaultImage,
+  // A GPUI page shows the same component as its React twin, so it shares its image.
+  image = images[pathname] ??
+    images[twinPath(pathname, "react")] ??
+    defaultImage,
 }: PageMetadataOptions): Metadata => {
   const fullTitle =
     pathname === "/" ? siteConfig.title : `${title} — ${siteConfig.name}`;

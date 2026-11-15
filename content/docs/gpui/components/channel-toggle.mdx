@@ -1,0 +1,112 @@
+---
+title: Channel Toggle
+description: Mute, solo and monitor toggle buttons with their own pressed colours, for GPUI.
+seoDescription: Mute, solo and monitor toggle buttons for GPUI apps in Rust, with tone colours from the audiocn theme. The audiocn Channel Toggle for Zed's UI framework.
+---
+
+<GpuiExample demo="channel-toggle" eager />
+
+## Installation
+
+```bash
+cargo add audiocn
+```
+
+## Usage
+
+```rust
+use audiocn::{MonitorToggle, MuteToggle, SoloToggle};
+```
+
+```rust
+let view = cx.entity();
+
+MuteToggle::new("mute")
+    .pressed(self.muted)
+    .on_pressed_change(move |muted, _, cx| {
+        view.update(cx, |this, cx| {
+            this.muted = muted;
+            cx.notify();
+        })
+    })
+    .child("M")
+```
+
+```rust
+SoloToggle::new("solo").child("S")
+```
+
+The presets set the tone and a default `aria_label`. Children are a letter, a word or an icon; nothing is rendered by default. `.icon(IconName::Headphones)` (from `audiocn::ui::icons`) adds an icon at the toggle's 14px size. Use `ChannelToggle` with a `.tone(..)` for anything else.
+
+`MuteToggle::new`, `SoloToggle::new` and `MonitorToggle::new` return a `ChannelToggle`, so every builder method below works on them. The id keeps focus and uncontrolled state between renders. Leave out `.pressed(..)` for an uncontrolled toggle.
+
+## Examples
+
+### Variants
+
+<GpuiExample demo="channel-toggle" variant="variants" />
+
+## Theming
+
+The toggle paints with the active `audiocn::Theme`. The React tokens and attributes map to theme fields and builder options:
+
+| React | GPUI |
+| --- | --- |
+| `--channel-mute`, `--channel-solo`, `--channel-monitor` | `Theme::channel_mute`, `channel_solo`, `channel_monitor`, with their `*_foreground` fields for the text |
+| `data-pressed` | `.pressed(..)` or `.default_pressed(..)` |
+| `data-tone` | `.tone(ChannelToggleTone::Mute)`, `Solo`, `Monitor` or `Neutral` |
+
+Set the colours for the whole app with `audiocn::theme::set_theme(theme, cx)`. `channel_toggle_variants(theme, size, tone, variant, pressed)` returns the resolved `ChannelToggleStyle`, if you draw a matching button yourself.
+
+## Accessibility
+
+Toggles are focusable, and Space or Enter toggles them. They are exposed through GPUI's AccessKit tree as buttons with a toggled state. The presets are labelled "Mute", "Solo" and "Monitor"; override `.aria_label(..)` to name the channel, such as "Mute microphone".
+
+## API reference
+
+<PropsTable
+  rows={[
+    [
+      "new",
+      "(id: impl Into<ElementId>)",
+      null,
+      "Keeps focus and uncontrolled state between renders.",
+    ],
+    ["pressed", "bool", null, "Controlled pressed state."],
+    ["default_pressed", "bool", "false", null],
+    [
+      "on_pressed_change",
+      "Fn(bool, &mut Window, &mut App)",
+      null,
+      "Called with the next pressed state.",
+    ],
+    [
+      "tone",
+      "ChannelToggleTone",
+      "per preset, else Neutral",
+      "Colour when pressed: Mute, Solo, Monitor or Neutral.",
+    ],
+    [
+      "variant",
+      "ChannelToggleVariant",
+      "Default",
+      "Default, Outline or Ghost.",
+    ],
+    ["size", "ChannelToggleSize", "Default", "Sm, Default, Lg or Icon."],
+    [
+      "disabled",
+      "bool",
+      "config.disabled",
+      "Inherited from a channel strip through config.",
+    ],
+    [
+      "config",
+      "AudioConfig",
+      null,
+      "Settings from a channel strip, as from React's AudioConfigProvider.",
+    ],
+    ["aria_label", "impl Into<SharedString>", "per preset", "Accessible name."],
+    ["icon", "impl Into<Icon>", null, "Adds an icon child at 14px."],
+    ["child / children", "any element", null, "A letter, a word or an icon."],
+  ]}
+/>

@@ -1,0 +1,219 @@
+---
+title: Fader
+description: A volume fader in decibels for GPUI, with tapers, detents, a scale, reset and an editable value.
+seoDescription: A volume fader in decibels for GPUI apps in Rust, with audio tapers, detents, a dB scale, reset and an editable value. The audiocn Fader for Zed's UI framework.
+---
+
+<GpuiExample demo="fader" eager />
+
+## Installation
+
+```bash
+cargo add audiocn
+```
+
+## Usage
+
+```rust
+use audiocn::Fader;
+```
+
+```rust
+let view = cx.entity();
+
+Fader::new("microphone")
+    .aria_label("Microphone")
+    .value(self.gain_db)
+    .on_value_change(move |db, _window, cx| {
+        view.update(cx, |this, cx| {
+            this.gain_db = db;
+            cx.notify();
+        });
+    })
+```
+
+The value is always in dB. The taper decides where each dB value sits on the travel. The thumb snaps to 0 dB while dragging, and double-clicking it resets.
+
+`Fader::new` takes an element id, which keeps the drag, focus and uncontrolled state between renders. Leave out `.value(..)` and set `.default_value(..)` for an uncontrolled fader. Use `.on_value_change_with_details(..)` to also get the reason for each change.
+
+## Anatomy
+
+```rust
+Fader::new("microphone")
+    .value(db)
+    .on_value_change(set_db)
+    .child(FaderLabel::new("Microphone"))
+    .child(FaderReset::new())
+    .child(FaderValue::new().editable(true))
+    .child(
+        FaderTrack::new()
+            .child(FaderRange::new())
+            .child(FaderThumb::new()),
+    )
+    .child(FaderScale::new())
+```
+
+A fader with no children gets a track, range and thumb. The parts read the fader's state while they render, so they can sit in any layout inside it, such as a `div()` row for the label, reset and value. `FaderTrack` accepts any children, so a `LevelMeter` can sit inside it.
+
+## Examples
+
+### Console faders
+
+`.taper(TaperInput::Audio)` gives more travel around 0 dB, like a mixing console.
+
+<GpuiExample demo="fader" variant="vertical" />
+
+### Bipolar gain
+
+Set `.origin(0.)` so the fill grows from the middle.
+
+<GpuiExample demo="fader" variant="bipolar" />
+
+### Silence at the bottom
+
+With `.silence_at_min(true)`, the lowest position reports `f32::NEG_INFINITY`.
+
+<GpuiExample demo="fader" variant="silence" />
+
+### With a meter in the track
+
+This example passes the fader value to `use_demo_signal` with `.with_gain_db(gain_db)`, so the meter shows the level after gain.
+
+<GpuiExample demo="fader" variant="with-meter" />
+
+### Sizes
+
+<GpuiExample demo="fader" variant="sizes" />
+
+## Keyboard
+
+| Key                                | Action                         |
+| ---------------------------------- | ------------------------------ |
+| Arrow keys                         | Change by `step` (0.5 dB)      |
+| Shift + arrow, Page Up / Page Down | Change by `large_step` (6 dB)  |
+| Alt + arrow                        | Change by `fine_step` (0.1 dB) |
+| Home / End                         | Minimum (or silence) / maximum |
+
+Holding Alt while dragging uses `fine_step` resolution.
+
+## Theming
+
+The fader paints with the active `audiocn::Theme`: the track with `input`, the range with `primary`, the thumb with `background` and a `ring` shadow. `FaderTrack`, `FaderRange` and `FaderThumb` implement `Styled`, so `.bg(..)` and other style methods restyle them. The React variables and attributes map to builder options:
+
+| React | GPUI |
+| --- | --- |
+| `--fader-track-size`, `--fader-thumb-size` | Set by `.size(AudioSize)`: a 3, 4 or 6 px track and a 12, 16 or 20 px thumb |
+| `data-orientation`, `data-variant`, `data-size` | `.orientation(..)`, `.variant(..)` and `.size(..)` |
+| `data-disabled` | `.disabled(true)` |
+| `data-dragging`, `data-at-detent`, `data-silent` | No equivalent. Compare the value in your `on_value_change` handler |
+
+## Accessibility
+
+The thumb is exposed to assistive technology as a slider whose value is the formatted text, such as "−6.0 dB" or "Silent". Name it with `.aria_label(..)`. `FaderLabel` is visible text that focuses the thumb when clicked, but it does not name the thumb in GPUI.
+
+## API reference
+
+### Fader
+
+<PropsTable
+  rows={[
+    [
+      "new",
+      "(id: impl Into<ElementId>)",
+      null,
+      "Keeps drag, focus and uncontrolled state between renders.",
+    ],
+    ["value", "f32", null, "The value in dB. f32::NEG_INFINITY is silence."],
+    ["default_value", "f32", "reset_value", null],
+    ["on_value_change", "Fn(f32, &mut Window, &mut App)", null, null],
+    [
+      "on_value_change_with_details",
+      "Fn(f32, FaderChangeDetails, &mut Window, &mut App)",
+      null,
+      "details.reason: Drag, TrackPress, Keyboard, Wheel, Reset or Input.",
+    ],
+    [
+      "on_value_committed",
+      "Fn(f32, &mut Window, &mut App)",
+      null,
+      "Fires when a drag ends, after keyboard input and on reset.",
+    ],
+    ["min", "f32", "-60.", null],
+    ["max", "f32", "6.", null],
+    ["step", "f32", "0.5", "Arrow keys and drag resolution."],
+    ["large_step", "f32", "6.", "Shift+arrow, Page Up and Page Down."],
+    ["fine_step", "f32", "0.1", "Alt+arrow and Alt+drag."],
+    ["reset_value", "f32", "0.", "Restored by double-click and FaderReset."],
+    [
+      "taper",
+      "impl Into<TaperInput>",
+      "Linear",
+      "Position law: Linear, Audio, Log or TaperInput::custom(..).",
+    ],
+    ["origin", "f32", "min", "Where the range fill starts."],
+    [
+      "detents",
+      "impl Into<Vec<f32>>",
+      "[0.]",
+      "Values the thumb snaps to while dragging.",
+    ],
+    [
+      "silence_at_min",
+      "bool",
+      "false",
+      "The lowest position reports f32::NEG_INFINITY.",
+    ],
+    [
+      "allow_wheel",
+      "bool",
+      "false",
+      "The wheel adjusts the value while focused.",
+    ],
+    [
+      "orientation",
+      "Orientation",
+      "Horizontal",
+      "Inherited from a channel strip through config.",
+    ],
+    ["variant", "FaderVariant", "Default", "Console has a wide cap thumb."],
+    ["size", "AudioSize", "Default", "Sm, Default or Lg."],
+    [
+      "format",
+      "Fn(f32) -> String",
+      "default_fader_format",
+      "Used by FaderValue and assistive technology.",
+    ],
+    [
+      "aria_label",
+      "impl Into<SharedString>",
+      null,
+      "The thumb's accessible name.",
+    ],
+    ["disabled", "bool", "false", null],
+    [
+      "config",
+      "AudioConfig",
+      null,
+      "Orientation, size and disabled from a surrounding strip or mixer. Explicit props win.",
+    ],
+  ]}
+/>
+
+### FaderValue
+
+The value is as wide as the longest text the fader's range can show, and right-aligned, so moving the fader never shifts the layout. The editor opens at the same width.
+
+<PropsTable
+  rows={[
+    [
+      "editable",
+      "bool",
+      "false",
+      'Click to type a value. Accepts "-6", "−6 dB" and "-inf".',
+    ],
+  ]}
+/>
+
+### FaderScale
+
+Takes [`DbScale`](/docs/gpui/components/db-scale) options: `ticks`, `side`, `labels`, `marks`, `format`, and custom ticks through `child` and `children`. The range, taper and orientation come from the fader.

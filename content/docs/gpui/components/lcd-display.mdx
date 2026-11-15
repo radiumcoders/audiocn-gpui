@@ -1,0 +1,245 @@
+---
+title: LCD Display
+description: A dot-matrix screen for GPUI, for labelled readouts and settings, backlit in the light theme and glowing in the dark one, with dropdown values.
+seoDescription: A hardware-style LCD screen for GPUI apps in Rust, with dot-matrix text, an ink that follows your theme or a fixed amber, green, cyan or red, and dropdown rows. The audiocn LCD Display for Zed's UI framework.
+---
+
+<GpuiExample demo="lcd-display" eager />
+
+## Installation
+
+```bash
+cargo add audiocn
+```
+
+## Usage
+
+```rust
+use audiocn::{LcdDisplay, LcdDisplayLabel, LcdDisplayRow, LcdDisplayValue};
+```
+
+```rust
+LcdDisplay::new("transport").child(
+    LcdDisplayRow::new()
+        .child(LcdDisplayLabel::new("Tempo"))
+        .child(LcdDisplayValue::new("tempo", "128.0")),
+)
+```
+
+The screen follows your theme. Its ink is the theme's `primary`, so it takes the colour of any theme. In light mode it is a backlit LCD: pale glass tinted by the ink, with dark pixels, like a calculator. In dark mode it is dark glass where the ink itself glows. Labels are dim, values are bright, and a value dims for a moment when its text changes, like segments redrawing. `LcdDisplayValue::new` takes an id, which keeps that flicker's state between renders.
+
+Set `.appearance(LcdDisplayAppearance::Light)` or `.appearance(LcdDisplayAppearance::Dark)` to keep one look in both modes, for example a dark screen on a light page.
+
+## Anatomy
+
+```rust
+LcdDisplay::new("settings")
+    .child(
+        LcdDisplayRow::new()
+            .child(LcdDisplayLabel::new("Model"))
+            .child(
+                LcdDisplaySelect::new("model")
+                    .child(LcdDisplaySelectTrigger::new())
+                    .child(
+                        LcdDisplaySelectContent::new()
+                            .child(LcdDisplaySelectItem::new("opus", "Opus 5.5")),
+                    ),
+            ),
+    )
+    .child(LcdDisplaySeparator::new())
+    .child(
+        LcdDisplayRow::new()
+            .child(LcdDisplayLabel::new("Effort"))
+            .child(LcdDisplayValue::new("effort", "High")),
+    )
+    .child(LcdDisplayStatus::new())
+```
+
+A row holds a label and either a read-only `LcdDisplayValue` or an `LcdDisplaySelect`. `LcdDisplaySelect` is a port of [Base UI's Select](https://base-ui.com/react/components/select) with the same options as builder methods: `value`, `default_value`, `on_value_change`, `open`, `default_open`, `on_open_change`, `disabled` and `items`. Pass `.items(..)` as `(value, label)` pairs to show each value's label in the trigger.
+
+## Examples
+
+### Inks
+
+The ink is the theme's `primary` by default (`LcdDisplayVariant::Primary`), so the screen changes with your theme. Switch the theme in the sidebar to see the demo above follow it. For a fixed hardware look, `.variant(..)` also takes `Amber`, `Green`, `Cyan` or `Red`.
+
+<GpuiExample demo="lcd-display" variant="variants" />
+
+For any other colour, set `.ink(..)`. The glass, the lit, dim and unlit pixels and the glow are mixed from it, in both themes. The select's popup is drawn from the same display settings, so it takes the same colour.
+
+```rust
+LcdDisplay::new("screen").ink(gpui::rgb(0xa78bfa))
+```
+
+### A dot-matrix font
+
+The screen breaks any font into dots, so it looks like an LCD with the font you already have. GPUI has no CSS masks, so the port paints the dot grid itself at the window's scale factor. For true 5 × 7 characters, load a dot-matrix face such as [Doto](https://fonts.google.com/specimen/Doto), point `.font(..)` at it and turn the dots off with `.matrix(false)`.
+
+<GpuiExample demo="lcd-display" variant="font" />
+
+```rust
+// Once at startup: register the font with GPUI's text system.
+cx.text_system()
+    .add_fonts(vec![include_bytes!("../fonts/Doto-Black.ttf").as_slice().into()])?;
+```
+
+```rust
+LcdDisplay::new("screen")
+    .font(cx.theme().font_doto.clone())
+    // The heaviest weight, so the dots fill out.
+    .font_weight(FontWeight::BLACK)
+    .matrix(false)
+```
+
+`Theme::font_doto` names the family, `"Doto"` by default.
+
+### A level meter
+
+For a level meter on the same screen, add an [LCD Meter](/docs/gpui/components/lcd-meter). It takes the display's ink, appearance and size.
+
+```rust
+LcdDisplay::new("input")
+    .child(
+        LcdDisplayRow::new()
+            .child(LcdDisplayLabel::new("Input"))
+            .child(LcdDisplayValue::new("device", "USB Mic")),
+    )
+    .child(LcdDisplaySeparator::new())
+    .child(
+        LcdMeter::new("input-level")
+            .aria_label("Input level")
+            .source(meter_source.clone()),
+    )
+```
+
+## Theming
+
+Every React CSS variable is a builder method on `LcdDisplay`, with the same defaults. Set several at once with `.vars(LcdDisplayVars { .. })`.
+
+| React | GPUI |
+| --- | --- |
+| `--lcd-display-ink` | `.ink(color)`, set by `.variant(..)`. Default: the theme's `primary` |
+| `--lcd-display-lit` | `.lit(color)`. Light: the ink darkened. Dark: the ink |
+| `--lcd-display-ink-dim` | `.ink_dim(color)`, for labels and the separator. Default: the lit pixels at 40% |
+| `--lcd-display-ink-unlit` | `.ink_unlit(color)`, the unlit dots behind the text. Default: the lit pixels at 7% |
+| `--lcd-display-glass` | `.glass(color)`. Light: a pale glass in the ink's hue. Dark: near black |
+| `--lcd-display-glow` | `.glow(color)`. Light: a faint shadow. Dark: the ink at 60% |
+| `--lcd-display-bezel`, `--lcd-display-bezel-edge` | `.bezel(color)` and `.bezel_edge(color)`, the frame's gradient, top to bottom |
+| `--lcd-display-font` | `.font(family)`. Default: the theme's `font_mono` |
+| `--lcd-display-pitch` | `.pitch(px)`. Default `px(2.)` |
+| `data-appearance` | `.appearance(..)`: `Auto`, `Light` or `Dark` |
+| `data-size` | `.size(..)` |
+| `data-variant` | `.variant(..)` |
+| `data-matrix` | `.matrix(..)` |
+| `data-changed` | No equivalent. The flicker is drawn for you |
+| `data-state` | `LcdDisplayStatus::state(..)`: `Idle`, `Busy` or `Off` |
+
+`.bezel_ring(..)`, `.bezel_shadow(..)`, `.recess(..)`, `.scanline(..)`, `.sheen(..)` and `.font_weight(..)` set the rest of the screen. `LcdDisplayLabel::color(..)` and `LcdDisplayValue::color(..)` recolour a single label or value.
+
+`.size(LcdDisplaySize)` sets the text size: `Sm`, `Default` or `Lg` (14, 18 or 24 px). The rows and the select's popup follow it.
+
+## Accessibility
+
+The display is a group. Each select's trigger is a combo box named by its row's `LcdDisplayLabel`, or by `LcdDisplaySelectTrigger::aria_label(..)` outside a row. Enter, Space and the arrow keys open it. In the list, the arrows move the highlight, Home and End jump to the ends, typing jumps to a matching item, Enter or Space selects, and Escape or Tab closes it. GPUI has no live regions yet, so a value with `.live(true)` is exposed as a status named by its text instead. The status pixel is decorative. Blinking and the change flicker stop when the app sets `audiocn::signal::reduced_motion::set_reduced_motion(true, cx)`, since GPUI has no reduced-motion query.
+
+## API reference
+
+### LcdDisplay
+
+<PropsTable
+  rows={[
+    ["new", "(id: impl Into<ElementId>)", null, null],
+    [
+      "variant",
+      "LcdDisplayVariant",
+      "Primary",
+      "The ink colour. Primary follows the theme's primary; Amber, Green, Cyan and Red are fixed hardware inks.",
+    ],
+    [
+      "appearance",
+      "LcdDisplayAppearance",
+      "Auto",
+      "Light is a backlit screen with dark pixels, Dark is dark glass with glowing ink, Auto follows the theme.",
+    ],
+    ["matrix", "bool", "true", "Breaks the text into dots on a pitch grid."],
+    ["scanlines", "bool", "true", "Faint horizontal lines over the glass."],
+    ["size", "LcdDisplaySize", "Default", "The text size: Sm, Default or Lg."],
+    [
+      "vars",
+      "LcdDisplayVars",
+      null,
+      "Every colour, font and pitch override at once. See Theming.",
+    ],
+  ]}
+/>
+
+### LcdDisplayValue
+
+<PropsTable
+  rows={[
+    [
+      "new",
+      "(id: impl Into<ElementId>, text: impl Into<SharedString>)",
+      null,
+      "The id keeps the change flicker's state.",
+    ],
+    [
+      "live",
+      "bool",
+      "false",
+      "Exposes the value as a status named by its text. GPUI has no live regions yet.",
+    ],
+    ["color", "impl Into<Hsla>", "lit", null],
+  ]}
+/>
+
+### LcdDisplayStatus
+
+<PropsTable
+  rows={[
+    [
+      "state",
+      "LcdDisplayStatusState",
+      "Idle",
+      "Idle blinks slowly, Busy quickly, Off stays unlit.",
+    ],
+  ]}
+/>
+
+### LcdDisplaySelectTrigger
+
+<PropsTable
+  rows={[
+    [
+      "placeholder",
+      "impl Into<SharedString>",
+      null,
+      "Shown while nothing is selected.",
+    ],
+    [
+      "child",
+      "impl Into<SharedString>",
+      null,
+      "Text shown instead of the value.",
+    ],
+    [
+      "aria_label",
+      "impl Into<SharedString>",
+      "the row's label",
+      "Names the trigger outside a row.",
+    ],
+  ]}
+/>
+
+### LcdDisplaySelectContent
+
+Takes `LcdDisplaySelectItem::new(value, label)` items through `child` and `children`. `.disabled(true)` on an item skips it.
+
+<PropsTable
+  rows={[
+    ["side", "LcdDisplaySelectSide", "Bottom", "Top, Right, Bottom or Left."],
+    ["side_offset", "f32", "8.", null],
+    ["align", "LcdDisplaySelectAlign", "End", "Start, Center or End."],
+    ["align_offset", "f32", "0.", null],
+  ]}
+/>

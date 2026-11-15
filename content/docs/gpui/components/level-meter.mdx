@@ -1,0 +1,277 @@
+---
+title: Level Meter
+description: A peak and RMS level meter with zones, peak hold, a scale, a readout and a clip light, painted by GPUI.
+seoDescription: A peak and RMS level meter for GPUI apps in Rust, with colour zones, peak hold, ballistics, a dB scale, a readout and a clip light. The audiocn Level Meter for Zed's UI framework.
+---
+
+<GpuiExample demo="level-meter" eager />
+
+## Installation
+
+```bash
+cargo add audiocn
+```
+
+## Usage
+
+```rust
+use audiocn::LevelMeter;
+```
+
+```rust
+LevelMeter::new("mic").aria_label("Microphone level").peak_db(-12.)
+```
+
+`LevelMeter::new` takes an element id, which keeps the meter's ballistics and peak hold between renders. Give each meter an id that is unique among its siblings.
+
+With no children, `LevelMeter` renders one track per channel with a peak bar and a peak-hold tick. Add children to control the anatomy.
+
+## Anatomy
+
+```rust
+use audiocn::{
+    LevelMeter, LevelMeterBar, LevelMeterChannel, LevelMeterChannels, LevelMeterClip,
+    LevelMeterHold, LevelMeterMeasure, LevelMeterScale, LevelMeterTrack, LevelMeterValue,
+};
+
+LevelMeter::new("program")
+    .source(meter.clone())
+    .child(
+        LevelMeterChannels::new()
+            .child(
+                LevelMeterChannel::new().index(0).child(
+                    LevelMeterTrack::new()
+                        .child(LevelMeterBar::new().measure(LevelMeterMeasure::Rms))
+                        .child(LevelMeterBar::new().measure(LevelMeterMeasure::Peak))
+                        .child(LevelMeterHold::new()),
+                ),
+            )
+            .child(LevelMeterScale::new()),
+    )
+    .child(LevelMeterValue::new())
+    .child(LevelMeterClip::new())
+```
+
+## Examples
+
+### Default
+
+<GpuiExample demo="level-meter" variant="simple" />
+
+### Values
+
+Pass `.peak_db(..)` (and optionally `.rms_db(..)`) for data that arrives slowly. The meter still moves smoothly between updates.
+
+<GpuiExample demo="level-meter" variant="values" />
+
+### Vertical
+
+<GpuiExample demo="level-meter" variant="vertical" />
+
+### Variants
+
+<GpuiExample demo="level-meter" variant="variants" />
+
+### Peak and RMS
+
+Layer an `Rms` bar over a translucent `Peak` bar for a dual meter. `LevelMeterBar::opacity(..)` replaces the React `opacity-40` class.
+
+<GpuiExample demo="level-meter" variant="dual" />
+
+### Ballistics
+
+`BallisticsPreset::Peak` rises in 15 ms and falls steadily; `Vu` is slow and averaged; `Instant` follows the input exactly.
+
+<GpuiExample demo="level-meter" variant="ballistics" />
+
+### Colors and zones
+
+Override a zone colour with `.zone_color(MeterZoneName::Ok, color)`, or pass your own `.zones(..)`.
+
+<GpuiExample demo="level-meter" variant="custom-colors" />
+
+### Build your own visual
+
+React writes each channel's live level to `--meter-level` (0..1). Here any element rendered inside a `LevelMeterChannel` reads it with `use_level_meter`:
+
+```rust
+let reading = use_level_meter("SpeakingRings").channel_reading();
+// reading.level, reading.rms and reading.hold are 0..1; reading.zone and reading.active too.
+```
+
+<GpuiExample demo="level-meter" variant="css-level" />
+
+For a meter drawn on a dot-matrix screen, see [LCD Meter](/docs/gpui/components/lcd-meter), which is built on this one.
+
+### Microphone
+
+With the `device` feature, `audiocn::io::use_microphone` opens the default input and hands you its meter source.
+
+<GpuiExample demo="level-meter" variant="microphone" />
+
+## Feeding data
+
+A meter accepts levels three ways. See [Feeding data](/docs/gpui/concepts/feeding-data).
+
+```rust
+use audiocn::{ChannelLevel, LevelMeter, LevelMeterActions, MeterFrame};
+
+// A source: the meter reads it while painting and asks for frames only while it moves.
+LevelMeter::new("a").source(meter.clone())
+
+// Values: for slow data. Ballistics smooth the movement.
+LevelMeter::new("b").peak_db(-9.1).rms_db(-18.)
+
+// A handle: for callers that own their own frame loop.
+let actions = LevelMeterActions::new();
+LevelMeter::new("c").actions(actions.clone())
+// later
+actions.paint(MeterFrame::mono(ChannelLevel::new(-9.1)), cx);
+```
+
+A `FrameSource` is a shared slot, not an event stream: producers on any thread `emit` into a `FrameEmitter`, and a settled meter polls the source so new frames wake it.
+
+## Theming
+
+The meter paints with the active `audiocn::Theme`. The React CSS variables are theme fields and builder options here:
+
+| React | GPUI |
+| --- | --- |
+| `--meter-ok`, `--meter-warn`, `--meter-clip` | `Theme::meter_ok`, `meter_warn`, `meter_clip`, or `LevelMeter::zone_color(zone, color)` for one meter |
+| `--meter-thickness` | `.size(AudioSize)`: `Sm` 4px, `Default` 8px, `Lg` 12px |
+| `--meter-gap` | 4px between channels; restyle `LevelMeterChannels` with `.gap(..)` |
+| `--meter-level`, `--meter-rms`, `--meter-hold` | `use_level_meter(..).channel_reading()`: `level`, `rms`, `hold`, 0..1 |
+
+The React data attributes are readings you can branch on:
+
+| React | GPUI |
+| --- | --- |
+| `data-orientation`, `data-variant`, `data-size` | `LevelMeterContext::orientation`, `variant`, `size` |
+| `data-zone` | `context.root.zone` for the root, `channel_reading().zone` for a channel |
+| `data-clipping` | `context.root.clipping`, or `LevelMeterActions::clipping(cx)` |
+| `data-active` | `channel_reading().active` |
+| `data-dimmed` | `AudioConfig::dimmed`, which draws the meter at 50% |
+| `data-measure` | `LevelMeterBar::measure(..)` |
+
+`LevelMeterHold::color(..)` sets the peak-hold tick, which defaults to `foreground` at 80%.
+
+## Accessibility
+
+- The root has the AccessKit role `Meter` with its minimum, maximum and current value in dB, and a value text such as "−12.0 dB". These update at most four times a second.
+- Give every meter a name with `.aria_label(..)`.
+- With reduced motion, the meter shows the current level four times a second instead of animating. GPUI has no system query for it, so set it with `audiocn::signal::reduced_motion::set_reduced_motion(true, cx)`.
+
+## API reference
+
+### LevelMeter
+
+<PropsTable
+  rows={[
+    [
+      "new",
+      "(id: impl Into<ElementId>)",
+      null,
+      "Keeps ballistics and peak hold between renders.",
+    ],
+    [
+      "source",
+      "impl Into<Option<FrameSource<MeterFrame>>>",
+      null,
+      "Read while painting; the meter requests frames only while it moves.",
+    ],
+    ["peak_db", "f32", null, "Mono peak level in dBFS, for declarative use."],
+    ["rms_db", "f32", null, "Mono RMS level in dBFS."],
+    [
+      "channels",
+      "impl Into<Vec<ChannelLevel>>",
+      null,
+      "Levels per channel, for declarative multi-channel use.",
+    ],
+    ["channel_count", "usize", "1", "Tracks to render before data arrives."],
+    ["min_db", "f32", "-60.", "Bottom of the displayed range."],
+    ["max_db", "f32", "0.", "Top of the displayed range."],
+    [
+      "zones",
+      "impl Into<Vec<MeterZone>>",
+      "DEFAULT_ZONES",
+      "Colour zones: ok, warn from −20, clip from −9.",
+    ],
+    [
+      "ballistics",
+      "impl Into<BallisticsInput>",
+      "BallisticsPreset::Peak",
+      "How the meter moves: Peak, Vu, Instant, or BallisticsOptions.",
+    ],
+    [
+      "taper",
+      "impl Into<TaperInput>",
+      "TaperInput::Linear",
+      "Scale law: Linear, Audio, Log or Custom.",
+    ],
+    [
+      "orientation",
+      "Orientation",
+      "Horizontal",
+      "Inherited from a channel strip through config.",
+    ],
+    [
+      "variant",
+      "LevelMeterVariant",
+      "Solid",
+      "Solid, Segmented or Gradient. Segmented is an LED ladder.",
+    ],
+    ["segments", "usize", "24", "Segments for the Segmented variant."],
+    ["size", "AudioSize", "Default", "Track thickness."],
+    [
+      "zone_color",
+      "(MeterZoneName, impl Into<Hsla>)",
+      "the theme's meter colours",
+      "Overrides one zone's colour.",
+    ],
+    [
+      "config",
+      "AudioConfig",
+      null,
+      "Range, zones, ballistics, orientation, size and dimmed from a strip or mixer. Explicit options win.",
+    ],
+    [
+      "actions",
+      "LevelMeterActions",
+      null,
+      "paint(frame, cx), reset(cx) and clipping(cx).",
+    ],
+    ["aria_label", "impl Into<SharedString>", null, "Accessible name."],
+    [
+      "child / children",
+      "LevelMeterChannels, LevelMeterValue, LevelMeterClip or any element",
+      null,
+      null,
+    ],
+  ]}
+/>
+
+### LevelMeterChannel
+
+<PropsTable
+  rows={[
+    ["index", "usize", "0", "Which channel of the frames this track shows."],
+  ]}
+/>
+
+### LevelMeterBar
+
+<PropsTable
+  rows={[
+    [
+      "measure",
+      "LevelMeterMeasure",
+      "Peak",
+      "Which measurement the bar shows: Peak or Rms.",
+    ],
+    ["opacity", "f32", "1.", null],
+  ]}
+/>
+
+### LevelMeterScale, LevelMeterValue, LevelMeterClip
+
+These wrap [`DbScale`](/docs/gpui/components/db-scale), [`DbReadout`](/docs/gpui/components/db-readout) and [`ClipIndicator`](/docs/gpui/components/clip-indicator), and take their builder options. The range, orientation and data come from the meter. `LevelMeterValue` and `LevelMeterClip` also take `.id(..)` when a meter has more than one.

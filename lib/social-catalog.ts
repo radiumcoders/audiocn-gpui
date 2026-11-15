@@ -1,3 +1,5 @@
+import { frameworkOf } from "@/lib/docs/framework";
+
 export type SocialPreviewName =
   | "home"
   | "mixer"
@@ -252,7 +254,14 @@ const categoryForPage = (pathname: string) => {
   return "Documentation / React";
 };
 
-export const getSocialCards = (pages: SocialPage[]): SocialCardDefinition[] => {
+/**
+ * One card per page, except the GPUI docs (`/docs/gpui/...`): they show the
+ * same components as their React twins and reuse those images.
+ */
+export const getSocialCards = (
+  allPages: SocialPage[]
+): SocialCardDefinition[] => {
+  const pages = allPages.filter((page) => frameworkOf(page.url) === "react");
   const home = featuredCards.find((card) => card.pathname === "/");
   if (!home) {
     throw new Error("The social catalog must define a homepage card.");

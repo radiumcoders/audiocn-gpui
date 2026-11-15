@@ -1,0 +1,239 @@
+---
+title: Channel Strip
+description: One channel of a mixer, as a row or a console strip, composed from the parts you need, in GPUI.
+seoDescription: A mixer channel strip for GPUI apps in Rust, as a row or a console strip, that hands its size, orientation and muted state to the meters, faders and toggles inside it. The audiocn Channel Strip for Zed's UI framework.
+---
+
+<GpuiExample demo="channel-strip" eager />
+
+In these previews, the fader applies gain to the demo signal and mute silences it. The meter shows the level after both controls. Muting or excluding a channel with solo clears its meter immediately; audible channels keep their normal meter ballistics.
+
+## Installation
+
+```bash
+cargo add audiocn
+```
+
+`ChannelStrip` is layout and settings only. The meters, faders and toggles you put inside it ship in the same crate, and the [System Audio Mixer](/docs/gpui/blocks/system-audio-mixer) block puts them all together.
+
+## Usage
+
+```rust
+use audiocn::{
+    AudioSize, ChannelStrip, ChannelStripHeader, ChannelStripTitle, LevelMeter, MuteToggle,
+};
+```
+
+```rust
+ChannelStrip::new("mic")
+    .muted(self.muted)
+    .child(ChannelStripHeader::new().child(ChannelStripTitle::new("Microphone")))
+    .meter(LevelMeter::new("mic-level").size(AudioSize::Sm).source(signal.meter))
+    .controls([MuteToggle::new("mic-mute").pressed(self.muted).child("M")])
+```
+
+Every part is optional. The smallest useful strip is a title, a meter and a mute toggle. `.meter(..)`, `.fader(..)` and `.controls(..)` place a `LevelMeter`, a `Fader` and channel toggles in their slots and hand them the strip's settings; see [how it passes settings down](#how-it-passes-settings-down).
+
+## Anatomy
+
+```rust
+ChannelStrip::new("mic")
+    .child(
+        ChannelStripHeader::new()
+            .child(ChannelStripIcon::new())
+            .child(
+                ChannelStripText::new()
+                    .child(ChannelStripTitle::new("Microphone"))
+                    .child(ChannelStripDescription::new("Shure MV7+")),
+            )
+            .child(ChannelStripStatus::new())
+            .child(ChannelStripActions::new()),
+    )
+    .child(ChannelStripMeter::new())
+    .child(ChannelStripFader::new())
+    .child(ChannelStripValue::new())
+    .child(ChannelStripControls::new())
+    .child(ChannelStripNotice::new())
+```
+
+## Examples
+
+### Console strips
+
+With `.orientation(Orientation::Vertical)`, the meter and fader stand side by side. These strips share one `use_mixer` store, so solo silences the other channels.
+
+<GpuiExample demo="channel-strip" variant="console" />
+
+### Notices
+
+<GpuiExample demo="channel-strip" variant="notices" />
+
+## How it passes settings down
+
+In React, a strip wraps its children in an `AudioConfigProvider`, and every component inside reads it with `useAudioConfig()`. GPUI has no React-style context, so the settings travel as a value: an `AudioConfig` (orientation, size, disabled, dimmed, and the mixer's dB range, zones and ballistics). Every audiocn component that reads the config in React takes it with `.config(AudioConfig)`, and resolves each setting as explicit builder call, then config, then its own default. Explicit settings on a child always win.
+
+The strip's config is its own `orientation`, `size` and `disabled` state, with `dimmed` set when the strip is `muted` or `dimmed`, merged over the config of the [mixer](/docs/gpui/components/mixer) around it. Meters that get it render dimmed while the strip is muted, and faders turn vertical in a console strip. You hand it to the components inside in one of three ways:
+
+1. **The shortcuts.** `.meter(level_meter)`, `.fader(fader)` and `.controls(toggles)` wrap the component in its slot and pass it the strip's final config. Use them for the common parts.
+
+2. **`child_with`.** The closure runs when the strip renders and gets a `ChannelStripContext`, whose `config` is final: the strip's settings merged over its mixer's.
+
+   ```rust
+   ChannelStrip::new("mic")
+       .muted(muted)
+       .child_with(move |strip, _, _| {
+           ChannelStripMeter::new().child(
+               LevelMeter::new("mic-level")
+                   .channel_count(2)
+                   .config(strip.config.clone())
+                   .source(source),
+           )
+       })
+   ```
+
+3. **`child_config()`.** For children you build up front. It only knows what was set on the builder, so set `muted`, `dimmed`, `orientation` and the rest first, and pass the mixer's `Mixer::child_config()` to the strip's `.config(..)` if there is one.
+
+   ```rust
+   let strip = ChannelStrip::new("mic").muted(muted).config(mixer_config);
+   let config = strip.child_config();
+   strip.child(ChannelStripFader::new().child(Fader::new("mic-gain").config(config)))
+   ```
+
+A component added with a plain `.child(..)` and no `.config(..)` keeps its own defaults: it does not dim with the strip or follow its orientation.
+
+`ChannelStripContext` also carries the strip's `orientation`, `muted`, `solo` and `dimmed` state. Custom parts that render inside a strip read it with `use_channel_strip()`, and the config of the nearest strip or mixer with `use_inherited_audio_config()`. Call them while your part renders: outside a strip, `use_channel_strip()` returns `None` (React throws there), and outside a strip or mixer `use_inherited_audio_config()` returns the default config.
+
+## Layout
+
+Parts place themselves by area, whatever order you add them in: header, meter, fader, value, controls and notice. Each part tells the strip which area it fills, and the strip sorts them into the layout for its orientation. Any other child goes below. The areas are fixed; `channel_strip_template_areas(..)` returns the grid each layout follows, as rows of area names.
+
+A row measures its own width after layout. Below 36rem (576px) it puts the header on its own line, with the meter and fader full width underneath, so rows stay readable in narrow panels. From 36rem up the header sits beside the meter in a column `.header_width(..)` wide, 12rem (192px) by default. Give every row in a mixer the same width to align them; the header wraps its status and actions onto a second line before it truncates the title.
+
+`ChannelStripFader` removes the fader's end padding so its track and scale reach the meter's edges in both orientations. At minimum and maximum, the thumb's centre aligns with the track edge. For track-only faders, strips centre the visible meter and fader tracks as a group in both orientations, while keeping the fader's full thumb and pointer target.
+
+Horizontal strips reserve a notice row only when you include `ChannelStripNotice`, so strips without a notice keep equal top and bottom spacing.
+
+`ChannelStripValue` centres its content in vertical strips and aligns it to the right in horizontal strips.
+
+A vertical strip keeps its width inside a mixer. When the strips do not fit, the mixer's channels scroll instead of squeezing them.
+
+## Theming
+
+The strip paints with the active `audiocn::Theme`. The React variables and attributes are builder options here:
+
+| React | GPUI |
+| --- | --- |
+| `--channel-accent` | `.accent(color)`, drawn as a colour tag |
+| `--channel-strip-width` | Fixed at 6.5rem (104px) for a vertical strip; override with `.w(..)` |
+| `--channel-strip-header-width` | `.header_width(px)`, default 12rem (192px) |
+| `data-muted`, `data-solo`, `data-dimmed`, `data-selected`, `data-disabled` | `.muted(..)`, `.solo(..)`, `.dimmed(..)`, `.selected(..)`, `.disabled(..)` |
+| `data-clipping` | No equivalent; the meter's own clip light shows clipping |
+| `data-orientation`, `data-variant`, `data-size` | `.orientation(..)`, `.variant(..)`, `.size(..)` |
+
+## Accessibility
+
+Controls inside the strip are focusable and carry their own names in GPUI's AccessKit tree: toggles are buttons with a toggled state, and meters and faders take an `aria_label`. The strip itself and its notices add no group, status or alert role yet, so name each control after its channel, such as "Microphone volume". State is never shown by colour alone: pair a muted strip with a pressed mute toggle and a status label.
+
+## API reference
+
+### ChannelStrip
+
+<PropsTable
+  rows={[
+    [
+      "new",
+      "(id: impl Into<ElementId>)",
+      null,
+      "Keeps the strip's focus and measured width between renders.",
+    ],
+    [
+      "orientation",
+      "Orientation",
+      "from config, else Horizontal",
+      "Horizontal is a row; vertical is a console strip.",
+    ],
+    [
+      "variant",
+      "ChannelStripVariant",
+      "Default",
+      "Default, Card, Ghost or Master.",
+    ],
+    ["size", "AudioSize", "from config", "Passed to controls inside."],
+    ["muted", "bool", "false", "Styling and config only."],
+    ["solo", "bool", "false", null],
+    ["dimmed", "bool", "false", "Silenced by another channel's solo."],
+    ["selected", "bool", "false", null],
+    [
+      "disabled",
+      "bool",
+      "from config, else false",
+      "Disables every control inside.",
+    ],
+    ["accent", "impl Into<Hsla>", null, "The colour tag."],
+    ["header_width", "Pixels", "px(192.)", "Header column of a wide row."],
+    [
+      "config",
+      "AudioConfig",
+      "inherited from a Mixer",
+      "The parent's config; merged over the inherited one.",
+    ],
+    [
+      "meter",
+      "LevelMeter",
+      null,
+      "Adds the meter in its slot, with the strip's config.",
+    ],
+    [
+      "fader",
+      "Fader",
+      null,
+      "Adds the fader in its slot, with the strip's config.",
+    ],
+    [
+      "controls",
+      "impl IntoIterator<Item = ChannelToggle>",
+      null,
+      "Adds the toggles in their slot, with the strip's config.",
+    ],
+    [
+      "child_with",
+      "FnOnce(&ChannelStripContext, &mut Window, &mut App) -> impl IntoElement",
+      null,
+      "Builds a child when the strip renders, from its final config.",
+    ],
+    [
+      "child_config",
+      "() -> AudioConfig",
+      null,
+      "The config as far as the builder knows.",
+    ],
+    ["child / children", "strip parts or any element", null, null],
+  ]}
+/>
+
+### ChannelStripStatus
+
+<PropsTable
+  rows={[
+    [
+      "tone",
+      "ChannelStripStatusTone",
+      "Default",
+      "Default, Live, Muted, Warning or Error. Rendered with the audiocn Badge.",
+    ],
+  ]}
+/>
+
+### ChannelStripNotice
+
+<PropsTable
+  rows={[
+    [
+      "variant",
+      "ChannelStripNoticeVariant",
+      "Default",
+      "Default, Warning or Destructive. Children can include an action button.",
+    ],
+    ["icon", "impl Into<Icon>", null, "Adds an icon child at 14px."],
+  ]}
+/>

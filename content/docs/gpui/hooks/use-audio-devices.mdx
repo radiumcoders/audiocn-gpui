@@ -1,0 +1,72 @@
+---
+title: use_audio_devices
+description: The list of audio input or output devices, with live updates.
+seoDescription: use_audio_devices lists native audio inputs and outputs in GPUI with audiocn's device feature, keeps the list current as devices come and go, and feeds AudioDeviceSelect.
+---
+
+```bash
+cargo add audiocn --features device
+```
+
+## Usage
+
+```rust
+use audiocn::io::use_audio_devices;
+use audiocn::{AudioDeviceKind, AudioDeviceSelect};
+
+let inputs = use_audio_devices("inputs", AudioDeviceKind::AudioInput, window, cx);
+let view = cx.entity();
+
+AudioDeviceSelect::new("input", inputs.devices.clone())
+    .loading(inputs.is_loading)
+    .permission(inputs.permission)
+    .value(self.device_id.clone())
+    .on_value_change(move |id, _, cx| {
+        view.update(cx, |this, cx| {
+            this.device_id = id;
+            cx.notify();
+        })
+    })
+```
+
+Desktop systems don't hide device names behind a permission, so labels are readable from the start and `permission` is always `Granted`. Inputs include monitor sources ("Monitor of …") when the sound server exposes them. Device ids are cpal's `"<host>:<device>"` strings; pass one to `MicrophoneOptions::device_id` or `AudioOutput::open`.
+
+## Options
+
+<PropsTable
+  rows={[
+    [
+      "kind",
+      "AudioDeviceKind",
+      "AudioInput",
+      "Which devices to list: AudioInput or AudioOutput.",
+    ],
+  ]}
+/>
+
+## Returns
+
+`UseAudioDevicesResult`:
+
+<PropsTable
+  rows={[
+    [
+      "devices",
+      "Vec<AudioDevice>",
+      null,
+      "{ id, label, kind, group_id, is_default, status, description }. Updates when devices are plugged in or removed.",
+    ],
+    ["permission", "AudioPermission", null, "Always Granted natively."],
+    ["is_loading", "bool", null, "True until the first list arrives."],
+    ["error", "Option<AudioIoError>", null, "The last error."],
+    ["refresh", "()", null, "List devices again now."],
+    [
+      "request_permission",
+      "() -> bool",
+      null,
+      "Nothing to ask for natively: lists again and returns true.",
+    ],
+  ]}
+/>
+
+A background thread lists devices again every second, and the view re-renders when the list changes. Outside a render, `AudioDevices::list(kind)` lists once and `AudioDevices::watch(kind)` keeps a list current.

@@ -1,0 +1,307 @@
+---
+title: Knob
+description: A rotary control for dense layouts, painted by GPUI.
+seoDescription: A rotary control for GPUI apps in Rust, with drag, keyboard input, precise adjustments and editable values. The audiocn Knob for Zed's UI framework.
+---
+
+<GpuiExample demo="knob" eager />
+
+## Installation
+
+```bash
+cargo add audiocn
+```
+
+## Usage
+
+```rust
+use audiocn::{Knob, KnobDial, KnobLabel, KnobPointer, KnobRange, KnobTrack, KnobValue};
+```
+
+```rust
+let view = cx.entity();
+
+Knob::new("gain")
+    .min(-24.)
+    .max(24.)
+    .origin(0.)
+    .value(self.gain)
+    .on_value_change(move |db, _details, _window, cx| {
+        view.update(cx, |this, cx| {
+            this.gain = db;
+            cx.notify();
+        });
+    })
+```
+
+`Knob::new` takes an element id, which keeps the knob's drag and focus state between renders. Give each knob an id that is unique among its siblings. Leave out `.value(..)` and set `.default_value(..)` for an uncontrolled knob.
+
+Drag the dial up to increase the value and down to decrease it. Set `.drag_direction(KnobDragDirection::Circular)` to turn it by circling around the dial, clockwise to increase and anticlockwise to decrease.
+
+| Action | Result |
+| --- | --- |
+| Drag | Turns the knob |
+| Shift+drag, Shift+wheel | Ten times finer, for precise adjustment. Press or release Shift mid-drag without a jump |
+| Double-click the dial, Alt+click | Resets to `reset_value` |
+| Double-click the value or label, Enter on the dial | Type a value; Enter applies it, Escape cancels |
+
+The value keeps one width across the whole range, so the layout never moves while you turn it.
+
+## Anatomy
+
+```rust
+Knob::new("gain")
+    .child(
+        KnobDial::new()
+            .child(KnobTrack::new())
+            .child(KnobRange::new())
+            .child(KnobPointer::new()),
+    )
+    .child(KnobValue::new())
+    .child(KnobLabel::new("Gain"))
+```
+
+A knob with no children gets this default anatomy. `KnobTrack`, `KnobRange` and `KnobPointer` are painted inside a 100 × 100 view box, in the order you add them. Paint your own shapes beside them with `KnobDial::paint`, which hands you a `KnobDialFrame` to map view box coordinates to pixels. `KnobScale` and `KnobCap` are another set of parts for the same dial, shown in the [volume dial](#volume-dial) and the [metal knobs](#metal-knobs).
+
+## Examples
+
+### Drag directions
+
+Choose `.drag_direction(..)` to match how you want to move the dial:
+
+- `KnobDragDirection::Vertical`, the default: drag up to increase the value, down to decrease it.
+- `KnobDragDirection::Horizontal`: drag right to increase the value, left to decrease it.
+- `KnobDragDirection::Circular`: turn clockwise to increase the value, anticlockwise to decrease it.
+
+Hold Shift for finer control in all three modes. For vertical and horizontal drags, `.sensitivity(..)` sets the distance in pixels for the full range. The default is `200.`.
+
+<GpuiExample demo="knob" variant="drag-directions" />
+
+### Sizes and disabled
+
+<GpuiExample demo="knob" variant="sizes" />
+
+### Volume dial
+
+A hi-fi volume dial: `KnobScale` draws numbered ticks around the dial and `KnobCap` a brushed aluminium cap with an indicator dot. Give it room for the numbers with a larger `.knob_size(..)`. `.click_sound(true)` adds a soft tick on each long graduation.
+
+<GpuiExample demo="knob" variant="volume" />
+
+Ticks between `origin` and the value light up, so a bipolar knob lights from its centre. The ticks are spread evenly along the arc, so they follow `.scale(KnobScaleType::Log)` too.
+
+### Custom click sound
+
+The knob decides when to click exactly like the React one, and hands each click to a `KnobClickPlayer` as a `ClickVoice`: a few milliseconds of synthesised samples at the player's rate. Play them with your audio engine. Set a player for the whole app with `cx.set_global(player)`, the way React uses `AudioContextProvider`, or for one knob with `.click_player(..)`. Without a player nothing plays, and nothing is synthesised.
+
+```rust
+cx.set_global(KnobClickPlayer::new(48_000, |voice, _cx| engine.play(voice.samples)));
+```
+
+Pass a `ClickSound` to `.click_sound(..)` to play a different click:
+
+```rust
+use audiocn::audio::click::{
+    ClickNoiseChanges, ClickSoundChanges, ClickToneChanges, create_click_sound,
+};
+
+let thud = create_click_sound(ClickSoundChanges {
+    tone: ClickToneChanges { hz: Some(460.), decay_ms: Some(1.3), gain: Some(1.) },
+    noise: ClickNoiseChanges { decay_ms: Some(0.75), gain: Some(0.21) },
+    volume: Some(0.18),
+    ..Default::default()
+});
+
+Knob::new("thud").click_sound(thud)
+```
+
+A click is a decaying sine (`tone`) over a decaying noise snap (`noise`). Unset fields keep the default tick.
+
+### Metal knobs
+
+The same aluminium at everyday sizes: swap `KnobPointer` for `KnobCap::new().variant(KnobCapVariant::Mini)`. The mini cap fills the inside of `KnobTrack` and marks the value with an engraved line, which still reads at `AudioSize::Sm`.
+
+<GpuiExample demo="knob" variant="metal" />
+
+```rust
+KnobDial::new()
+    .child(KnobTrack::new())
+    .child(KnobRange::new())
+    .child(KnobCap::new().variant(KnobCapVariant::Mini))
+```
+
+## Theming
+
+The knob paints with the active `audiocn::Theme`. The React CSS variables are builder options here:
+
+| React | GPUI |
+| --- | --- |
+| `--knob-size` | `Knob::knob_size(px)`, or `.size(AudioSize)` |
+| `--knob-cap-metal` | `KnobCap::metal(color)` |
+| `--knob-cap-shade` | `KnobCap::shade(color)` |
+| `--knob-cap-pitch` | `KnobCap::pitch(f32)` |
+| `stroke-*` classes on the parts | `.color(..)` on `KnobTrack`, `KnobRange` and `KnobPointer` |
+| `**:data-active:stroke-primary` on `KnobScale` | `KnobScale::active_color(color)` |
+
+## Accessibility
+
+The dial is focusable and takes the same keys as the [fader](/docs/gpui/components/fader#keyboard): arrows step by `step`, Shift+arrow, Page Up and Page Down by `large_step`, Alt+arrow by `fine_step`, Home and End jump to the ends, and Enter opens the value editor. The knob does not report a role, name or value to assistive technology yet, so the React ARIA attributes have no equivalent.
+
+## API reference
+
+<PropsTable
+  rows={[
+    [
+      "new",
+      "(id: impl Into<ElementId>)",
+      null,
+      "Keeps drag, focus and uncontrolled state between renders.",
+    ],
+    ["value", "f32", null, "Controlled value."],
+    ["default_value", "f32", null, "Starting value for an uncontrolled knob."],
+    [
+      "on_value_change",
+      "Fn(f32, &KnobChangeDetails, &mut Window, &mut App)",
+      null,
+      "details.reason: drag, keyboard, wheel, reset or input.",
+    ],
+    [
+      "on_value_committed",
+      "Fn(f32, &mut Window, &mut App)",
+      null,
+      "When a drag ends, or after a key, wheel, reset or typed value.",
+    ],
+    ["min / max", "f32", "0. / 100.", null],
+    [
+      "step / large_step / fine_step",
+      "f32",
+      "1. / 10. / step ÷ 10",
+      "fine_step applies to Shift+drag, Shift+wheel and Alt+arrow.",
+    ],
+    [
+      "reset_value",
+      "f32",
+      "default_value or min",
+      "Double-click or Alt+click restores it.",
+    ],
+    [
+      "origin",
+      "f32",
+      "min",
+      "Where the arc starts; the centre for bipolar knobs.",
+    ],
+    ["arc", "f32", "270.", "Sweep in degrees."],
+    [
+      "drag_direction",
+      "KnobDragDirection",
+      "Vertical",
+      "Circular turns the knob as you circle around it. Vertical and Horizontal drag in a straight line, as in most DAWs.",
+    ],
+    [
+      "sensitivity",
+      "f32",
+      "200.",
+      "Pixels of vertical or horizontal drag for the full range.",
+    ],
+    ["scale", "KnobScaleType", "Linear", "Linear or Log."],
+    ["allow_wheel", "bool", "false", null],
+    [
+      "click_sound",
+      "impl Into<KnobClickSound>",
+      "false",
+      "true plays a soft tick on each graduation, a ClickSound replaces it. At most every 30 ms.",
+    ],
+    [
+      "click_player",
+      "KnobClickPlayer",
+      "the global KnobClickPlayer",
+      "Plays the knob's clicks.",
+    ],
+    ["format", "Fn(f32) -> String", "format_knob_number", null],
+    [
+      "parse",
+      "Fn(&str) -> Option<f32>",
+      "parse_knob_value",
+      'Reads a typed value. The default takes the first number and reads "k" as thousands. Use parse_pan for pan knobs.',
+    ],
+    ["size", "AudioSize", "Default", "Sm, Default or Lg."],
+    [
+      "knob_size",
+      "impl Into<Pixels>",
+      null,
+      "Overrides the dial size from size.",
+    ],
+    ["disabled", "bool", "false", null],
+    [
+      "config",
+      "AudioConfig",
+      null,
+      "Size and disabled from a surrounding strip, as from React's AudioConfigProvider. Explicit props win.",
+    ],
+    [
+      "child / children",
+      "KnobDial, KnobValue, KnobLabel or any element",
+      null,
+      null,
+    ],
+  ]}
+/>
+
+### KnobValue
+
+<PropsTable
+  rows={[
+    [
+      "editable",
+      "bool",
+      "true",
+      "Double-click, or Enter on the dial, to type a value.",
+    ],
+  ]}
+/>
+
+### KnobScale
+
+<PropsTable
+  rows={[
+    ["ticks", "u32", "50", "Divisions across the arc; draws ticks + 1 marks."],
+    ["major_every", "u32", "5", "Every nth tick is long."],
+    [
+      "label_every",
+      "u32",
+      "10",
+      "Every nth tick is numbered. 0 hides the numbers.",
+    ],
+    ["format", "Fn(f32) -> String", "the knob's format", null],
+    [
+      "active_color",
+      "impl Into<Hsla>",
+      "theme.foreground",
+      "Colour of the ticks inside the lit range.",
+    ],
+  ]}
+/>
+
+### KnobCap
+
+<PropsTable
+  rows={[
+    [
+      "variant",
+      "KnobCapVariant",
+      "Default",
+      "Default sits inside KnobScale with an indicator dot. Mini fills the inside of KnobTrack with an engraved line, for small knobs.",
+    ],
+    [
+      "metal / shade",
+      "impl Into<Hsla>",
+      "white / black",
+      "The cap's metal and shading.",
+    ],
+    [
+      "pitch",
+      "f32",
+      "0.3 / 0.9 for Mini",
+      "Spacing of the brushed rings, in view box units.",
+    ],
+  ]}
+/>

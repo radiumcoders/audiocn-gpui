@@ -1,0 +1,105 @@
+---
+title: use_microphone
+description: Open a microphone with its meter and visual sources built in, raw by default.
+seoDescription: use_microphone opens a native microphone in GPUI with audiocn's device feature, with meter and visual frame sources for meters and visualizers, gain, mute and device choice.
+---
+
+```bash
+cargo add audiocn --features device
+```
+
+## Usage
+
+```rust
+use audiocn::io::{MicrophoneOptions, use_microphone};
+use audiocn::ui::Button;
+
+let microphone = use_microphone(
+    "mic",
+    MicrophoneOptions { device_id: self.device_id.clone(), ..Default::default() },
+    window,
+    cx,
+);
+
+div()
+    .child(LevelMeter::new("mic-level").source(microphone.meter.clone()))
+    .child(Button::new("start").child("Start").on_click(move |_, _, cx| microphone.start(cx)))
+```
+
+The microphone has an analyser built in, so `meter` and `visual` are ready for meters and visualizers, the job React's `useAudioAnalyser` does. They stay the same sources across start, stop and device changes.
+
+Capture is always raw. Browsers can turn on echo cancellation, noise suppression and automatic gain control, and React keeps them off by default because they change the level a meter shows. Native capture has no such processing, so those options are accepted for parity and do nothing.
+
+## Options
+
+`MicrophoneOptions`:
+
+<PropsTable
+  rows={[
+    [
+      "device_id",
+      "Option<String>",
+      "None",
+      "The device to open. None for the system default. Changing it reopens the device.",
+    ],
+    ["enabled", "bool", "false", "Open the microphone as soon as possible."],
+    [
+      "echo_cancellation",
+      "bool",
+      "false",
+      "Accepted for parity; native capture never processes.",
+    ],
+    ["noise_suppression", "bool", "false", "Accepted for parity."],
+    ["auto_gain_control", "bool", "false", "Accepted for parity."],
+    [
+      "channel_count",
+      "Option<u16>",
+      "None",
+      "Requested channel count, used when the device offers it.",
+    ],
+    [
+      "analyser",
+      "AnalyserTapOptions",
+      "AnalyserTapOptions::default()",
+      "The analyser behind meter and visual.",
+    ],
+  ]}
+/>
+
+## Returns
+
+`UseMicrophone`, cheap to clone:
+
+<PropsTable
+  rows={[
+    [
+      "meter",
+      "FrameSource<MeterFrame>",
+      null,
+      "Peak and RMS per channel, after the microphone's gain.",
+    ],
+    [
+      "visual",
+      "FrameSource<VisualFrame>",
+      null,
+      "Bands, history and time-domain samples.",
+    ],
+    [
+      "handle",
+      "Option<MicrophoneHandle>",
+      null,
+      "The open microphone: React's stream. Feed it to other nodes with AudioInput::Microphone.",
+    ],
+    [
+      "status",
+      "MicrophoneStatus",
+      null,
+      "Idle, Acquiring, Active, Denied, Unavailable or Error. Unavailable also covers a device that was unplugged.",
+    ],
+    ["error", "Option<AudioIoError>", null, "The last error."],
+    ["start", "(cx: &mut App)", null, "Open the microphone."],
+    ["stop", "(cx: &mut App)", null, "Close it and release the device."],
+  ]}
+/>
+
+A `MicrophoneHandle` also has `set_gain_db` and `set_muted`, applied before analysis and routing. Outside a render, `Microphone::start(options)` opens a microphone and waits for it, and `Microphone::open(options)` returns at once.

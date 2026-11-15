@@ -1,0 +1,112 @@
+---
+title: Smooth Waveform
+description: One clean line across the width that follows the sound, as a flowing wave or an oscilloscope trace, painted by GPUI.
+seoDescription: A smooth waveform line for GPUI apps in Rust that follows live audio as a flowing wave or an oscilloscope trace. The audiocn Smooth Waveform for Zed's UI framework.
+---
+
+<GpuiExample demo="smooth-waveform" eager />
+
+## Installation
+
+```bash
+cargo add audiocn
+```
+
+## Usage
+
+```rust
+use audiocn::{ActiveTheme, SmoothWaveform};
+```
+
+```rust
+SmoothWaveform::new("voice")
+    .text_color(cx.theme().primary)
+    .h(px(96.))
+    .source(visual.clone())
+```
+
+`visual` is a `FrameSource<VisualFrame>`, such as `use_microphone(..).visual`. `SmoothWaveform::new` takes an element id, which keeps the line between renders. Give each waveform an id that is unique among its siblings.
+
+The line takes its colour from the text colour. It is the plain version of the [electric waveform](/docs/gpui/components/electric-waveform): the same shape, with no crackle, glow or sparks.
+
+The waveform fills the width and is 96px tall by default, so size it with `Styled` methods such as `.h(..)` and `.max_w(..)`. It paints on every animation frame inside the element, follows its bounds and picks up theme changes on its own.
+
+## Examples
+
+### Wave and scope
+
+`SmoothWaveformMode::Wave` draws a smooth wave shaped by the frequency bands, calm enough for a voice assistant. `SmoothWaveformMode::Scope` draws the signal itself, like an oscilloscope, and starts each frame on a rising zero crossing so steady tones stand still.
+
+<GpuiExample demo="smooth-waveform" variant="modes" />
+
+### Idle and loading
+
+With no signal the line rests flat. `.loading(true)` runs a pulse along it, for connecting or thinking states.
+
+<GpuiExample demo="smooth-waveform" variant="states" />
+
+### Microphone
+
+The browser preview has no microphone: "Use my microphone" plays the demo speech signal into the scope instead, and stopping it lets the line fall flat. In a native app, enable the `device` feature and pass the visual source of `audiocn::io::use_microphone`:
+
+```bash
+cargo add audiocn --features device
+```
+
+```rust
+use audiocn::io::{MicrophoneOptions, MicrophoneStatus, use_microphone};
+use audiocn::{SmoothWaveform, SmoothWaveformMode};
+
+let mic = use_microphone("mic", MicrophoneOptions::default(), window, cx);
+let listening = mic.status == MicrophoneStatus::Active;
+
+SmoothWaveform::new("mic-line")
+    .mode(SmoothWaveformMode::Scope)
+    .source(mic.visual.clone())
+// In a button's on_click: if listening { mic.stop(cx) } else { mic.start(cx) }
+```
+
+The gallery runs the real microphone with `cargo run -p audiocn-gallery --features device`.
+
+<GpuiExample demo="smooth-waveform" variant="microphone" />
+
+## Theming
+
+| React | GPUI |
+| --- | --- |
+| `--waveform` | `.text_color(color)`, default the inherited text colour |
+| `data-mode`, `data-active`, `data-loading` | No equivalent: the state is what you pass to the builder |
+
+## Accessibility
+
+GPUI has no accessibility tree for this element yet, and `SmoothWaveform` has no `aria_label`. Label the meter or control next to it instead. With reduced motion the wave stops drifting and the line redraws four times a second. GPUI has no system query for it, so set it with `audiocn::signal::reduced_motion::set_reduced_motion(true, cx)`.
+
+## API reference
+
+<PropsTable
+  rows={[
+    [
+      "new",
+      "(id: impl Into<ElementId>)",
+      null,
+      "Keeps the line between renders.",
+    ],
+    ["source", "FrameSource<VisualFrame>", null, null],
+    [
+      "mode",
+      "SmoothWaveformMode",
+      "Wave",
+      "Wave follows the frequency bands; Scope draws the signal.",
+    ],
+    ["loading", "bool", "false", "Run a pulse along the line."],
+    ["sensitivity", "f32", "1.", "Visual gain."],
+    ["line_width", "f32", "2.", "Pixels."],
+    ["fade_edges", "bool", "true", "Fade the left and right ends."],
+    [
+      "actions",
+      "&SmoothWaveformActions",
+      null,
+      "Keep a clone and call paint(VisualFrame) or clear().",
+    ],
+  ]}
+/>

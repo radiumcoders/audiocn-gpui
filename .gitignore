@@ -42,6 +42,9 @@ next-env.d.ts
 # built registry
 /public/r
 
+# built GPUI examples (pnpm gpui:build)
+/public/gpui
+
 # playwright
 /test-results/
 /playwright-report/
