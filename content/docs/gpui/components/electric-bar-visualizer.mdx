@@ -1,0 +1,191 @@
+---
+title: Electric Bar Visualizer
+description: Frequency-band bars drawn as crackling filaments, with arcs between loud neighbours and sparks on sudden rises, painted by GPUI.
+seoDescription: An electric bar visualizer for GPUI apps in Rust, with crackling filaments, arcs and sparks driven by frequency bands. The audiocn Electric Bar Visualizer for Zed's UI framework.
+---
+
+<GpuiExample demo="electric-bar-visualizer" eager />
+
+## Installation
+
+```bash
+cargo add audiocn
+```
+
+## Usage
+
+```rust
+use audiocn::{ActiveTheme, ElectricBarVisualizer};
+```
+
+```rust
+ElectricBarVisualizer::new("voice")
+    .aria_label("Voice activity")
+    .text_color(cx.theme().primary)
+    .h(px(96.))
+    .source(visual.clone())
+```
+
+`visual` is a `FrameSource<VisualFrame>`, such as `use_microphone(..).visual`. `ElectricBarVisualizer::new` takes an element id, which keeps the bar levels, the crackle and the sparks between renders. Give each visualizer an id that is unique among its siblings.
+
+It takes the same data and nearly the same builder options as the [bar visualizer](/docs/gpui/components/bar-visualizer), so you can swap one for the other. Its alignment is an `ElectricBarAlign` and its bar sizes are plain `f32` pixels. The electric look comes from the shape and the motion, not from a fixed colour: the bars follow the text colour, so they turn with your theme. In dark mode the core runs white-hot.
+
+The visualizer fills the width and is 64px tall by default, so size it with `Styled` methods such as `.h(..)` and `.max_w(..)`. It paints on every animation frame inside the element, without re-rendering your view, follows its bounds and picks up theme changes on its own.
+
+## Examples
+
+### Colors
+
+Set the text colour with `.text_color(..)`, or `.electric(..)`, to any theme colour.
+
+<GpuiExample demo="electric-bar-visualizer" variant="colors" />
+
+### Intensity, arcs and sparks
+
+`.intensity(..)` sets how jagged and restless the filaments are. `.arcs(..)` jump between loud neighbouring bars and `.sparks(..)` fly off the tips when a level rises quickly.
+
+<GpuiExample demo="electric-bar-visualizer" variant="intensity" />
+
+### Idle and loading
+
+`.idle(BarIdle)` decides what bars do without a signal. `.loading(true)` runs an arc along the bars, for connecting or thinking states. `BarIdle` lives in `audiocn::audio::bar_levels`.
+
+<GpuiExample demo="electric-bar-visualizer" variant="states" />
+
+### Mirrored
+
+<GpuiExample demo="electric-bar-visualizer" variant="mirrored" />
+
+### Microphone
+
+The browser preview has no microphone: "Use my microphone" feeds the bars from the demo speech signal instead. In a native app, enable the `device` feature and pass the visual source of `audiocn::io::use_microphone`:
+
+```bash
+cargo add audiocn --features device
+```
+
+```rust
+use audiocn::audio::bar_levels::BarIdle;
+use audiocn::io::{MicrophoneOptions, MicrophoneStatus, use_microphone};
+use audiocn::{ElectricBarAlign, ElectricBarVisualizer};
+
+let mic = use_microphone("mic", MicrophoneOptions::default(), window, cx);
+let listening = mic.status == MicrophoneStatus::Active;
+
+ElectricBarVisualizer::new("mic-bars")
+    .align(ElectricBarAlign::End)
+    .idle(BarIdle::Wave)
+    .source(mic.visual.clone())
+// In a button's on_click: if listening { mic.stop(cx) } else { mic.start(cx) }
+```
+
+The gallery runs the real microphone with `cargo run -p audiocn-gallery --features device`.
+
+<GpuiExample demo="electric-bar-visualizer" variant="microphone" />
+
+## Theming
+
+The visualizer paints with the active `audiocn::Theme`. The React CSS variables are builder options here:
+
+| React | GPUI |
+| --- | --- |
+| `--electric` | `.electric(color)`, default the text colour (`.text_color(..)`) |
+| `--electric-core` | `.electric_core(color)`, default `electric` mixed toward white by the heat |
+| `--electric-heat` | `.electric_heat(f32)`, 0..1, default `0.` in light mode and `0.7` in dark mode (`Theme::is_dark`) |
+| `--electric-glow` | `.electric_glow(color)`, default `electric` |
+| `--electric-glow-size` | `.electric_glow_size(f32)`, the glow blur in pixels, default `8.` |
+| `data-active`, `data-loading`, `data-align` | No equivalent: the state is what you pass to the builder |
+
+## Accessibility
+
+GPUI has no accessibility tree for this element yet. `.aria_label(..)` is accepted for parity with React, default "Audio visualizer", but is not exposed.
+
+The flicker changes brightness by at most 12%, only on thin strokes, and each jagged shape holds for at least 40 ms, so nothing flashes across a large area. With reduced motion the bars are straight and still, with no arcs, sparks or flicker, and redraw four times a second. GPUI has no system query for it, so set it with `audiocn::signal::reduced_motion::set_reduced_motion(true, cx)`.
+
+## API reference
+
+<PropsTable
+  rows={[
+    [
+      "new",
+      "(id: impl Into<ElementId>)",
+      null,
+      "Keeps levels, crackle and sparks between renders.",
+    ],
+    [
+      "source",
+      "impl Into<Option<FrameSource<VisualFrame>>>",
+      null,
+      "Bars follow the frame's frequency bands.",
+    ],
+    [
+      "levels",
+      "impl Into<Vec<f32>>",
+      null,
+      "Levels, 0..1, for declarative use.",
+    ],
+    ["bar_count", "usize", "16", "Bands are resampled to fit."],
+    [
+      "align",
+      "ElectricBarAlign",
+      "Center",
+      "Center, Start or End: where bars grow from.",
+    ],
+    [
+      "mirrored",
+      "bool",
+      "false",
+      "Symmetric around the middle bar, lows in the centre.",
+    ],
+    ["min_level", "f32", "0.08", "Resting bar size, 0..1."],
+    [
+      "idle",
+      "BarIdle",
+      "Static",
+      "Static, Pulse or Wave: what bars do without a signal.",
+    ],
+    ["loading", "bool", "false", "Run an arc along the bars."],
+    [
+      "intensity",
+      "f32",
+      "0.6",
+      "How jagged and restless the filaments are, 0..1.",
+    ],
+    ["arcs", "bool", "true", "Arcs jump between loud neighbouring bars."],
+    ["sparks", "bool", "true", "Sparks fly off the tips on sudden rises."],
+    ["bar_width", "f32", "6.", "Widest bar, in pixels."],
+    ["bar_gap", "f32", "4.", "Pixels."],
+    [
+      "orientation",
+      "Orientation",
+      "the config's, else Horizontal",
+      "Vertical grows bars sideways.",
+    ],
+    [
+      "config",
+      "AudioConfig",
+      null,
+      "Shared orientation, as from React's AudioConfigProvider.",
+    ],
+    [
+      "actions",
+      "ElectricBarVisualizerActions",
+      null,
+      "Keep a clone and call paint(&[f32]) to paint levels directly.",
+    ],
+    [
+      "electric / electric_core / electric_glow",
+      "impl Into<Hsla>",
+      null,
+      "See Theming.",
+    ],
+    ["electric_heat", "f32", "0. light, 0.7 dark", null],
+    ["electric_glow_size", "f32", "8.", "Glow blur in pixels."],
+    [
+      "aria_label",
+      "impl Into<SharedString>",
+      '"Audio visualizer"',
+      "Kept for parity; not exposed yet.",
+    ],
+  ]}
+/>

@@ -1,0 +1,91 @@
+---
+title: FrameSource
+description: Read the latest frame of a source while painting, and request frames only while it moves.
+seoDescription: FrameSource is how audiocn's GPUI meters read live audio. Build your own components on any frame source by reading the latest frame while painting.
+---
+
+Every audiocn meter and visualizer reads its `.source(..)` this way. Use it to build your own components on any frame source.
+
+```bash
+cargo add audiocn
+```
+
+## Usage
+
+React subscribes a callback to a source. In GPUI a `FrameSource` is a shared slot that holds the latest frame, so there is nothing to subscribe to: read it while you render or paint, and ask for another frame while it moves.
+
+```rust
+use audiocn::audio::decibels::{DEFAULT_MAX_DB, DEFAULT_MIN_DB, db_to_level};
+use audiocn::{ActiveTheme, FrameSource, MeterFrame};
+use gpui::{App, IntoElement, RenderOnce, Window, div, prelude::*, px, relative};
+
+#[derive(IntoElement)]
+pub struct TinyMeter {
+    source: FrameSource<MeterFrame>,
+}
+
+impl RenderOnce for TinyMeter {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let peak_db = self.source.with_latest(|frame| {
+            frame.and_then(|frame| frame.channels.first()).map_or(f32::NEG_INFINITY, |c| c.peak_db)
+        });
+        let level = db_to_level(peak_db, DEFAULT_MIN_DB, DEFAULT_MAX_DB);
+        // Render again next frame to pick up the next level.
+        window.request_animation_frame();
+
+        div()
+            .h(px(8.))
+            .w(px(160.))
+            .rounded_full()
+            .bg(cx.theme().muted)
+            .child(div().h_full().w(relative(level)).rounded_full().bg(cx.theme().primary))
+    }
+}
+```
+
+`with_latest` reads the frame in place without cloning it. It asks for a frame every time it renders, which is fine for one small meter.
+
+<GpuiExample demo="frame-source" />
+
+The example feeds the "Microphone" row from an emitter that a timer task fills, standing in for an audio thread or a socket.
+
+## API
+
+<PropsTable
+  rows={[
+    [
+      "create_frame_emitter::<T>()",
+      "FrameEmitter<T>",
+      null,
+      "A new slot. Emitters are Send + Sync and cheap to clone.",
+    ],
+    [
+      "FrameEmitter::emit",
+      "(frame: T)",
+      null,
+      "Replaces the latest frame. Call it from any thread.",
+    ],
+    ["FrameEmitter::clear", "()", null, "Readers see None: no signal."],
+    ["FrameEmitter::source", "() -> FrameSource<T>", null, "The read side."],
+    [
+      "FrameSource::with_latest",
+      "(f: FnOnce(Option<&T>) -> R) -> R",
+      null,
+      "Reads the latest frame without cloning it.",
+    ],
+    [
+      "FrameSource::latest",
+      "() -> Option<T>",
+      null,
+      "A clone of the latest frame, for T: Clone.",
+    ],
+    [
+      "FrameSource::version",
+      "() -> u64",
+      null,
+      "Increments on every emit. Compare it with a stored value to see whether a new frame arrived.",
+    ],
+  ]}
+/>
+
+audiocn's meters go further and sleep once they settle. A frame from another thread can't wake a sleeping element, because GPUI only renders when asked, so the meters check `version()` on a short timer while they sleep, and request animation frames again when it changes. `FrameTask` in `audiocn::audio::frame_loop` gives you the same awake and asleep state machine for your own painters.

@@ -1,0 +1,131 @@
+---
+title: WebAudioMixer
+description: Binds mixer state to a native audio graph, with ducking, monitor sends, a limited master and meters.
+seoDescription: WebAudioMixer is audiocn's native mixer engine for GPUI, behind the device feature. It binds use_mixer state to real audio with ducking, monitor sends, a limiter and meters.
+---
+
+```bash
+cargo add audiocn --features device
+```
+
+## Usage
+
+```rust
+use audiocn::io::{AudioInput, Destination, DuckingOptions, WebAudioMixer, WebAudioMixerOptions};
+
+// Once, in your view:
+let graph = WebAudioMixer::new(WebAudioMixerOptions {
+    ducking: vec![DuckingOptions::new("mic", ["music"])],
+    ..Default::default()
+})?;
+
+// Inputs, when they open:
+graph.set_input("mic", AudioInput::Microphone(microphone_handle));
+player.update(cx, |player, _| player.set_destination(Destination::Bus(graph.input_bus("music"))))?;
+
+// In render, after use_mixer:
+graph.apply(&mixer.read(cx).state);
+
+div()
+    .child(LevelMeter::new("mic-level").source(graph.meter("mic")))
+    .child(LevelMeter::new("master-level").source(graph.master_meter()))
+```
+
+React's hook builds the graph with the component. A `WebAudioMixer` is a plain value: keep it in your view next to the [`use_mixer`](/docs/gpui/hooks/use-mixer) store, call `apply` with the mixer's state on every render, and drop it to tear the graph down. The [System Audio Mixer](/docs/gpui/blocks/system-audio-mixer) block is built on the same mixer state.
+
+## The graph
+
+Each channel runs through a gain, a ducking stage and an equal-power stereo panner. The panner feeds the master bus, and a monitor send feeds the speakers at the master level. The master bus runs through an optional peak limiter into the master meter.
+
+```
+input → gain → duck → pan ─┬─→ master → limiter → master meter
+                           └─→ monitor send → speakers
+```
+
+- Mute and solo are gain ramps, so they never click. Channels are built silent and fade in, so a muted channel is never heard while it is created.
+- A duck holds for 200 ms after the trigger's last loud frame, then releases. It also releases when the trigger channel goes away mid-duck.
+- `monitor` decides whether a channel is heard in the speakers. It is off by default so a microphone does not feed back; turn it on for music and sounds.
+- Players and sounds join the mix by playing into `input_bus(id)` instead of the speakers.
+
+## Options
+
+`WebAudioMixerOptions`. Inputs are not an option: set them with `set_input` or `input_bus`.
+
+<PropsTable
+  rows={[
+    [
+      "ducking",
+      "Vec<DuckingOptions>",
+      "[]",
+      "DuckingOptions::new(trigger, targets), with threshold_db = -35., amount_db = -12., attack_ms = 50., release_ms = 400.",
+    ],
+    ["limiter", "bool", "true", "A peak limiter on the master."],
+    [
+      "analyser",
+      "AnalyserTapOptions",
+      "AnalyserTapOptions::default()",
+      "Settings for the meters, which are always stereo.",
+    ],
+  ]}
+/>
+
+`WebAudioMixer::with_destination(options, destination)` sends the monitor output somewhere other than the speakers.
+
+## Returns
+
+`WebAudioMixer` methods:
+
+<PropsTable
+  rows={[
+    [
+      "set_input / remove_input",
+      "(id, AudioInput) / (id)",
+      null,
+      "Sets, replaces or removes a channel's input.",
+    ],
+    [
+      "input_bus",
+      "(id) -> Bus",
+      null,
+      "A bus feeding the channel, for players, sounds and gain nodes.",
+    ],
+    [
+      "apply",
+      "(state: &MixerState)",
+      null,
+      "Ramps every channel and the master to the state.",
+    ],
+    [
+      "set_ducking",
+      "(rules: Vec<DuckingOptions>)",
+      null,
+      "Replaces the ducking rules. Ducked channels release.",
+    ],
+    [
+      "meter / visual",
+      "(id) -> FrameSource<…>",
+      null,
+      "Post-fader stereo meter and visual frames per channel.",
+    ],
+    [
+      "master_meter / master_visual",
+      "() -> FrameSource<…>",
+      null,
+      "After the limiter.",
+    ],
+    [
+      "destination",
+      "() -> Bus",
+      null,
+      "The master bus input, for your own sources.",
+    ],
+    [
+      "limiter_reduction_db",
+      "() -> f32",
+      null,
+      "The limiter's gain reduction, 0 without a limiter.",
+    ],
+  ]}
+/>
+
+The sources stay the same while inputs change, so components never need new ones. React's `output` stream, for `MediaRecorder` or WebRTC, has no equivalent yet: the master is metered but not exposed for recording.

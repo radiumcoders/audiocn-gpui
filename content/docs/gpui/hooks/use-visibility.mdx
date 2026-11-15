@@ -1,0 +1,41 @@
+---
+title: Visibility
+description: GPUI has no useVisibility. Painters sleep when they settle, and lists render only the rows in view.
+seoDescription: How audiocn's GPUI meters avoid painting frames nobody sees without useVisibility, using FrameTask, settled painters and GPUI's virtual lists.
+---
+
+In React, every audiocn meter and visualizer uses `useVisibility` to stop painting while it is scrolled out of view. GPUI has no `IntersectionObserver`, and the port has no `use_visibility`. Two things do its job instead.
+
+## Usage
+
+GPUI only does work for elements you render, and an element only paints again when something asks for a frame. audiocn's painters ask for one only while they move: a meter that has settled, or has gone quiet, requests no frames at all.
+
+A meter that is rendered but scrolled out of view inside a scrolling `div` still renders while its signal moves. For long lists of meters or strips, use GPUI's `uniform_list` or `list`. They render only the rows in view, so an off-screen meter isn't rendered and requests no frames.
+
+```rust
+uniform_list("channels", self.channels.len(), cx.processor(|this, range, _, _| {
+    range
+        .map(|ix| {
+            let channel = &this.channels[ix];
+            LevelMeter::new(channel.id.clone()).source(channel.meter.clone())
+        })
+        .collect()
+}))
+```
+
+## Waking a sleeping loop
+
+React painters use `createFrameTask` with `useVisibility` to sleep and wake. The same state machine is `FrameTask` in `audiocn::audio::frame_loop`. Run it from render or paint; it returns whether to request another frame, and sleeps once your step returns `false` until you call `wake()`:
+
+```rust
+use audiocn::audio::frame_loop::{FrameTask, now_ms};
+
+// in render, with `task: FrameTask` in your view:
+let spinning = self.spinning;
+if self.task.run(now_ms(), |_| spinning) {
+    window.request_animation_frame();
+}
+
+// when something should move again:
+self.task.wake();
+```

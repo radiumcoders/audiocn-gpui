@@ -1,0 +1,104 @@
+---
+title: use_mixer
+description: "Mixer state with no audio attached: gain, mute, solo, pan and monitor per channel, plus a master."
+seoDescription: use_mixer keeps mixer state in GPUI, with gain, mute, solo, pan and monitor per channel plus a master, and knows which channels are audible. No audio attached.
+---
+
+```bash
+cargo add audiocn
+```
+
+## Usage
+
+```rust
+use audiocn::signal::mixer::{MixerChannelInit, MixerOptions, use_mixer};
+
+let mixer = use_mixer(
+    "mixer",
+    MixerOptions {
+        channels: vec![MixerChannelInit::new("mic"), MixerChannelInit::new("music").gain_db(-12.)],
+        ..Default::default()
+    },
+    window,
+    cx,
+);
+
+mixer.update(cx, |mixer, cx| {
+    mixer.set_gain("mic", -3.);
+    mixer.set_solo("music", true, true);
+    mixer.is_audible("mic"); // false while music is soloed
+    cx.notify();
+});
+```
+
+`use_mixer` returns an `Entity<MixerStore>` kept under its id. The options only seed it on the first render; change it from callbacks and call `cx.notify()` to re-render. A `MixerStore` dereferences to the `MixerState`, so every method below works on it.
+
+`use_mixer` only holds state. Connect it to sound with [`WebAudioMixer`](/docs/gpui/hooks/use-web-audio-mixer), or read `mixer.state` and send it to your own engine.
+
+## Options
+
+`MixerOptions`:
+
+<PropsTable
+  rows={[
+    [
+      "channels",
+      "Vec<MixerChannelInit>",
+      "[]",
+      "Initial channels: MixerChannelInit::new(id) with gain_db, muted, solo, pan and monitor builders. Missing fields get defaults.",
+    ],
+    ["master", "MixerMasterPatch", "{ gain_db: 0., muted: false }", null],
+  ]}
+/>
+
+A channel is `MixerChannelState { id, gain_db, muted, solo, pan, monitor }`. `pan` runs from −1 to 1. React's controlled `state`, `onStateChange` and `persistKey` have no options here: the store is yours to read after each change and to save yourself.
+
+## Returns
+
+`MixerStore`, and the `MixerState` it dereferences to:
+
+<PropsTable
+  rows={[
+    [
+      "state / channels / master",
+      "MixerState / Vec<MixerChannelState> / MixerMasterState",
+      null,
+      "Current state, as fields.",
+    ],
+    ["channel", "(id: &str) -> Option<&MixerChannelState>", null, null],
+    [
+      "set_gain / set_muted / set_pan / set_monitor",
+      "(id: &str, value) -> bool",
+      null,
+      "Returns whether anything changed.",
+    ],
+    [
+      "set_solo",
+      "(id: &str, solo: bool, exclusive: bool) -> bool",
+      null,
+      "exclusive un-solos every other channel.",
+    ],
+    ["set_master_gain / set_master_muted", "(value) -> bool", null, null],
+    [
+      "is_audible",
+      "(id: &str) -> bool",
+      null,
+      "False when muted, or when another channel is soloed.",
+    ],
+    [
+      "is_dimmed",
+      "(id: &str) -> bool",
+      null,
+      "True when silenced only by another channel's solo.",
+    ],
+    [
+      "add_channel / remove_channel",
+      "(MixerChannelInit) / (id: &str) -> bool",
+      null,
+      null,
+    ],
+    ["reset", "() -> bool", null, "Back to the initial state."],
+  ]}
+/>
+
+`mixer_reducer`, `MixerAction` and `is_channel_audible` are exported for use outside GPUI.

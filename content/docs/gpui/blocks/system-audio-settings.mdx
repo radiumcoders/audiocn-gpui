@@ -1,0 +1,115 @@
+---
+title: System Audio Settings
+description: Turn system audio capture on, set its level and see what gets captured, as a GPUI block.
+seoDescription: A system audio settings block for GPUI apps in Rust, with a capture switch, state label, level control, stereo meter and notices. Wire it to native system audio capture with the audiocn device feature.
+---
+
+<GpuiExample demo="system-audio-settings" eager />
+
+## Installation
+
+```bash
+cargo add audiocn
+```
+
+The block is part of the crate: `audiocn::SystemAudioSettings`. To capture real system audio, add the `device` feature:
+
+```bash
+cargo add audiocn --features device
+```
+
+## What it does
+
+- A switch that starts and stops capture. In the browser that is the screen-share picker; natively, `audiocn::io::use_system_audio` captures the default output.
+- A state label: Off, On, Choose what to share, No audio shared, Ended, Needs permission or Unsupported.
+- A level control (−24 to +12 dB, default −6 dB) and a stereo meter while capture is on.
+- Notices that explain what gets captured, or why nothing can be.
+
+The block captures nothing itself. Pass the capture status and its meter, start and stop capture in `on_start` and `on_stop`, and apply the level from `on_gain_change` to the audio you route. There is no `MediaStream` in GPUI: `on_stream_change` reports `true` while the processed capture is live and `false` when it is not. Without a status and a meter, the switch drives a stereo demo signal, which is what the preview shows.
+
+```rust
+use audiocn::io::system_audio::is_supported;
+use audiocn::io::{AnalyserChannels, AnalyserTapOptions, SystemAudioOptions, use_system_audio};
+use audiocn::SystemAudioSettings;
+
+let system = use_system_audio(
+    "system",
+    SystemAudioOptions {
+        analyser: AnalyserTapOptions { channels: AnalyserChannels::Stereo, ..Default::default() },
+        ..Default::default()
+    },
+    window,
+    cx,
+);
+if let Some(stream) = system.stream() {
+    stream.set_gain_db(self.gain_db);
+}
+let (start, stop) = (system.clone(), system.clone());
+let view = cx.entity();
+
+SystemAudioSettings::new("system")
+    .supported(is_supported())
+    .status(system.status().into())
+    .meter_source(system.meter_source())
+    .gain_db(self.gain_db)
+    .on_gain_change(move |db, _, cx| view.update(cx, |this, cx| {
+        this.gain_db = db;
+        cx.notify();
+    }))
+    .on_start(move |_, _| start.start())
+    .on_stop(move |_, _| stop.stop())
+```
+
+## Props
+
+<PropsTable
+  rows={[
+    [
+      "new",
+      "(id: impl Into<ElementId>)",
+      null,
+      "Keeps the block's own state between renders.",
+    ],
+    [
+      "enabled / on_enabled_change",
+      "bool",
+      null,
+      "Optional control of capture.",
+    ],
+    ["gain_db / on_gain_change", "f32", "-6.", null],
+    [
+      "on_stream_change",
+      "Fn(bool, &mut Window, &mut App)",
+      null,
+      "Whether the captured audio, after the level control, is live.",
+    ],
+    [
+      "status",
+      "SystemAudioStatus",
+      "the demo",
+      "Capture state, e.g. use_system_audio(..).status().into().",
+    ],
+    [
+      "supported",
+      "bool",
+      "true",
+      "false shows Unsupported, disables the switch and explains why.",
+    ],
+    [
+      "meter_source",
+      "FrameSource<MeterFrame>",
+      "the demo signal",
+      "Stereo meter of the capture, after the level control.",
+    ],
+    [
+      "on_start / on_stop",
+      "Fn(&mut Window, &mut App)",
+      null,
+      "Start and stop capture, from the switch or from enabled.",
+    ],
+  ]}
+/>
+
+## Files
+
+The block lives in `src/blocks/system_audio_settings.rs` of the `audiocn` crate. To change more than the builder options allow, copy the file into your app, rename the `crate::` paths to `audiocn::`, and edit it. One import is private to the crate: the `TextSize` helpers (`text_xs_()`, `text_sm_()`, ...), which set a font size and line height. Replace them with GPUI's `.text_size(px(12.)).line_height(px(16.))` and so on.

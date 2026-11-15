@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 
+import { twinPath } from "../lib/docs/framework";
 import { siteConfig } from "../lib/site";
 import socialImages from "../lib/social-images.json" with { type: "json" };
 import type { SocialImage } from "../lib/social-metadata";
@@ -51,7 +52,8 @@ for (const pathname of publicPages) {
     expect(description?.length).toBeGreaterThan(20);
     expect(meta("og:description")).toBe(description);
     expect(meta("twitter:description")).toBe(description);
-    const image = images[pathname];
+    // GPUI pages share their React twin's image.
+    const image = images[pathname] ?? images[twinPath(pathname, "react")];
     expect(image).toBeDefined();
     if (!image) {
       throw new Error(`Missing social image for ${pathname}`);

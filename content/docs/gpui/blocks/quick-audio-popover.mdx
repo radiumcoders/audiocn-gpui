@@ -1,0 +1,122 @@
+---
+title: Quick Audio Popover
+description: Microphone and system audio controls behind one toolbar button that shows a live level, as a GPUI block.
+seoDescription: A quick audio popover block for GPUI apps in Rust, a toolbar button with a live level that opens microphone select, on/off, mute and system audio controls. Wire it to native audio with the audiocn device feature.
+---
+
+<GpuiExample demo="quick-audio-popover" eager />
+
+## Installation
+
+```bash
+cargo add audiocn
+```
+
+The block is part of the crate: `audiocn::QuickAudioPopover`. To control real microphones and system audio, add the `device` feature:
+
+```bash
+cargo add audiocn --features device
+```
+
+## What it does
+
+The trigger shows the microphone state and a small live [bar visualizer](/docs/gpui/components/bar-visualizer). The popover holds the microphone select, on/off and mute buttons, and a system audio switch. Children go at the bottom, for a link to full settings.
+
+The block opens no devices. Pass the device list and the analyser's visual source, and turn the microphone and system audio on and off in `on_microphone` and `on_system_audio`. Leave the microphone uncontrolled and pass no source, and "Turn on" feeds the bars with a speech demo signal, which is what the preview shows.
+
+```rust
+use audiocn::io::{MicrophoneOptions, MicrophoneStatus, use_audio_devices, use_microphone};
+use audiocn::ui::{Button, ButtonSize, ButtonVariant};
+use audiocn::{AudioDeviceKind, QuickAudioPopover};
+
+let devices = use_audio_devices("audio/devices", AudioDeviceKind::AudioInput, window, cx);
+let mic = use_microphone("audio/microphone", MicrophoneOptions::default(), window, cx);
+let toggle = mic.clone();
+
+QuickAudioPopover::new("quick-audio")
+    .devices(devices.devices.clone())
+    .microphone_active(mic.status == MicrophoneStatus::Active)
+    .on_microphone(move |on, _, cx| if on { toggle.start(cx) } else { toggle.stop(cx) })
+    .source(mic.visual.clone())
+    .child(
+        Button::new("audio-settings")
+            .w_full()
+            .size(ButtonSize::Sm)
+            .variant(ButtonVariant::Ghost)
+            .child("More audio settings"),
+    )
+```
+
+## Props
+
+<PropsTable
+  rows={[
+    [
+      "new",
+      "(id: impl Into<ElementId>)",
+      null,
+      "Keeps the block's own state between renders.",
+    ],
+    [
+      "child / children",
+      "impl IntoElement",
+      null,
+      "Extra content at the bottom.",
+    ],
+    ["side", "Side", "Bottom", "Top, Bottom, Left or Right."],
+    ["align", "Align", "Center", "Start, Center or End."],
+    [
+      "devices / loading",
+      "Vec<AudioDevice> / bool",
+      "demo_microphones() / false",
+      "Microphones for the select.",
+    ],
+    [
+      "device_id / on_device_change",
+      "Option<SharedString>",
+      null,
+      "Optional control of the selected device.",
+    ],
+    [
+      "permission / on_request_permission",
+      "AudioPermission / Fn(&mut Window, &mut App)",
+      "Granted",
+      null,
+    ],
+    [
+      "microphone_active / on_microphone",
+      "bool / Fn(bool, &mut Window, &mut App)",
+      null,
+      "Optional control of the microphone.",
+    ],
+    ["muted / on_muted_change", "bool", null, "Optional control of mute."],
+    [
+      "source",
+      "FrameSource<VisualFrame>",
+      "the demo signal",
+      "Bar levels, shown while the microphone is on and not muted.",
+    ],
+    [
+      "system_supported",
+      "bool",
+      "true",
+      "false disables the system audio switch.",
+    ],
+    [
+      "system_active / default_system_active / on_system_audio",
+      "bool / bool / Fn(bool, &mut Window, &mut App)",
+      "false",
+      "The system audio switch.",
+    ],
+    [
+      "open / default_open / on_open_change",
+      "bool / bool / Fn(bool, &mut Window, &mut App)",
+      "false",
+      "The popover's open state.",
+    ],
+  ]}
+/>
+
+## Files
+
+The block lives in `src/blocks/quick_audio_popover.rs` of the `audiocn` crate. To change more than the builder options allow, copy the file into your app, rename the `crate::` paths to `audiocn::`, and edit it. It uses only the crate's public API.

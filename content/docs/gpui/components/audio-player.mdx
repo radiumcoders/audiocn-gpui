@@ -1,0 +1,249 @@
+---
+title: Audio Player
+description: A composable audio player with transport, seeking, time, volume, rate, loop and keyboard shortcuts, for GPUI.
+seoDescription: A composable audio player for GPUI apps in Rust, with transport, seeking, time, volume, rate, loop and keyboard shortcuts, and native playback behind the device feature. The audiocn Audio Player for Zed's UI framework.
+---
+
+<GpuiExample demo="audio-player" eager />
+
+## Installation
+
+```bash
+cargo add audiocn
+```
+
+The player UI works on its own with any engine you plug in. For native playback of files, add the `device` feature:
+
+```bash
+cargo add audiocn --features device
+```
+
+## Usage
+
+```rust
+use audiocn::{AudioPlayer, AudioPlayerPlay, AudioPlayerSeek};
+```
+
+```rust
+AudioPlayer::new("episode")
+    .src("/audio/episode.mp3")
+    .child(AudioPlayerPlay::new())
+    .child(AudioPlayerSeek::new())
+```
+
+Every part is optional. A play button and a seek bar is a complete player. Buttons show a text label unless you give them a child, so the component works with any icon set.
+
+`AudioPlayer::new` takes an element id, which keeps the internal player and the focus of its buttons between renders. Give each player an id that is unique among its siblings.
+
+The player UI never touches audio itself. It drives an [`AudioPlayerController`](#your-own-player-state), and `.src(..)` hands the source to the app's default engine. Install the native one once at startup, and every `AudioPlayer` with a `src` plays for real:
+
+```rust
+app.run(|cx: &mut App| {
+    audiocn::io::install_audio_player_backend(cx);
+    // open your window
+});
+```
+
+Without a backend nothing can decode the source, so the player reports an error, like an `<audio>` element that cannot load its file. Natively a `src` is a file path, a `file://` URL, or a site path like `/audio/episode.mp3` that resolves against `audiocn::io::set_asset_root(..)`. Remote `http(s)` URLs are not supported. The whole file is decoded into memory on a background thread when the source is set.
+
+## Anatomy
+
+```rust
+AudioPlayer::new("player")
+    .child(AudioPlayerArtwork::new(cover))
+    .child(AudioPlayerTitle::new())
+    .child(AudioPlayerDescription::new())
+    .child(
+        AudioPlayerControls::new()
+            .child(AudioPlayerPrevious::new())
+            .child(AudioPlayerSkipBack::new())
+            .child(AudioPlayerPlay::new())
+            .child(AudioPlayerSkipForward::new())
+            .child(AudioPlayerNext::new()),
+    )
+    .child(AudioPlayerTime::new())
+    .child(AudioPlayerSeek::new())
+    .child(AudioPlayerTime::new().r#type(AudioPlayerTimeType::Remaining))
+    .child(AudioPlayerVolume::new())
+    .child(AudioPlayerRate::new())
+    .child(AudioPlayerLoop::new())
+```
+
+The root is a wrapping flex row, and every part takes GPUI's style methods, so lay the parts out with `div()`s the way the examples do. Each button part keeps its focus under a default id that is unique within one player; set `.id(..)` only when a player has two of the same button.
+
+## Examples
+
+### Compact
+
+<GpuiExample demo="audio-player" variant="compact" />
+
+### With a waveform and a playlist
+
+The [Music Player](/docs/gpui/blocks/music-player) block uses a [Waveform](/docs/gpui/components/waveform) as the seek bar and a [Track List](/docs/gpui/components/track-list) for the queue.
+
+### Your own player state
+
+Create the player yourself and pass it in with `.player(..)`, to reach it from outside, route it into a mixer or analyse it. With the `device` feature, `audiocn::io::use_audio_player` keeps an `AudioPlayerEngine` in keyed state and returns its entity:
+
+```rust
+use audiocn::io::use_audio_player;
+use audiocn::{AudioPlayer, AudioPlayerPlay, AudioPlayerSeek, BarVisualizer, UseAudioPlayerOptions};
+
+let player = use_audio_player("episode", UseAudioPlayerOptions::src("/audio/episode.mp3"), window, cx);
+let visual = player.read(cx).visual_source();
+
+div()
+    .child(BarVisualizer::new("bars").source(visual))
+    .child(
+        AudioPlayer::new("player")
+            .player(player)
+            .child(AudioPlayerPlay::new())
+            .child(AudioPlayerSeek::new()),
+    )
+```
+
+`AudioPlayerEngine` also has `meter_source()` for meters, and `set_destination(Destination::Bus(bus))` to play into a mixer channel instead of the speakers. Without the `device` feature, `use_simulated_player(id, duration, options, window, cx)` gives you a `SimulatedPlayer`: the same states and events on a clock, with no audio output. The examples on this page use it.
+
+Any engine works: implement the `AudioPlayerController` trait (`state`, `time`, `play`, `pause`, `seek`, `set_volume`, `set_muted`, `set_playback_rate`, `set_loop`) for your own entity and pass it to `.player(..)`, or make it the default for `.src(..)` with `audiocn::set_audio_player_backend(..)`.
+
+`use_audio_player_context()` returns the player from inside any part, while it renders.
+
+## Keyboard
+
+While focus is inside the player:
+
+| Key                  | Action        |
+| -------------------- | ------------- |
+| Space or K           | Play or pause |
+| Left / Right         | Seek 5 s      |
+| Shift + Left / Right | Seek 15 s     |
+| Up / Down            | Volume        |
+| M                    | Mute          |
+| Home / End           | Start or end  |
+
+Space and K don't toggle playback while a button has focus, and the arrows belong to the seek and volume sliders while they have focus. Wrap your own buttons in `AudioPlayerKeyTarget::new(ShortcutTarget::BUTTON, ..)` to get the same behaviour. `.shortcuts(false)` turns the shortcuts off.
+
+## Theming
+
+The parts paint with the active `audiocn::Theme`: the play button with `primary`, the seek bar's played range with `primary` over `muted`, and times and descriptions with `muted_foreground`. GPUI has no data attributes, so read the player state where React would style on them:
+
+| React | GPUI |
+| --- | --- |
+| `data-playing`, `data-paused`, `data-loading`, `data-ended`, `data-error`, `data-muted` | `player.state(cx)`: `status: AudioPlayerStatus`, `playing`, `muted` and `error` |
+
+## API reference
+
+### AudioPlayer
+
+<PropsTable
+  rows={[
+    [
+      "new",
+      "(id: impl Into<ElementId>)",
+      null,
+      "Keeps the internal player and the parts' focus between renders.",
+    ],
+    [
+      "src",
+      "impl Into<SharedString>",
+      null,
+      "A file path, file:// URL or site path. Ignored with player.",
+    ],
+    [
+      "player",
+      "impl AudioPlayerController",
+      null,
+      "Use an external player, e.g. from use_audio_player or use_simulated_player. player_rc takes an Rc<dyn AudioPlayerController>.",
+    ],
+    ["auto_play / loop / muted", "bool", "false", "loop is r#loop in Rust."],
+    ["volume", "f32", "1.", "0..1."],
+    ["playback_rate", "f32", "1.", null],
+    [
+      "preload",
+      "AudioPreload",
+      "Metadata",
+      "None, Metadata or Auto. The native engine always decodes the whole file.",
+    ],
+    [
+      "cross_origin",
+      "CrossOrigin",
+      null,
+      "Anonymous or UseCredentials. Kept for parity: native playback reads local files.",
+    ],
+    ["on_play / on_pause / on_ended", "Fn(&mut Window, &mut App)", null, null],
+    [
+      "on_time_update",
+      "Fn(f64, &mut Window, &mut App)",
+      null,
+      "Seconds, when the current time changes.",
+    ],
+    [
+      "on_previous / on_next",
+      "Fn(&mut Window, &mut App)",
+      null,
+      "Enable the previous and next buttons.",
+    ],
+    [
+      "on_error",
+      "Fn(Option<SharedString>, &mut Window, &mut App)",
+      null,
+      "The error message, if any.",
+    ],
+    ["shortcuts", "bool", "true", "Keyboard shortcuts while focus is inside."],
+  ]}
+/>
+
+### AudioPlayerPlay
+
+<PropsTable
+  rows={[
+    [
+      "child / children",
+      "impl IntoElement",
+      null,
+      "An icon. Without children the button shows Play or Pause as text.",
+    ],
+    [
+      "children_with",
+      "Fn(AudioPlayerPlayState) -> AnyElement",
+      null,
+      "Children as a function of the state: playing and loading.",
+    ],
+  ]}
+/>
+
+### AudioPlayerSkipBack, AudioPlayerSkipForward
+
+<PropsTable rows={[["seconds", "f64", "10.", null]]} />
+
+### AudioPlayerTime
+
+<PropsTable
+  rows={[
+    [
+      "r#type",
+      "AudioPlayerTimeType",
+      "Current",
+      "Current, Remaining or Duration.",
+    ],
+    [
+      "format",
+      "Fn(f64, AudioPlayerTimeType) -> String",
+      "default_time_format",
+      null,
+    ],
+  ]}
+/>
+
+### AudioPlayerRate
+
+<PropsTable
+  rows={[
+    [
+      "rates",
+      "Vec<f32>",
+      "vec![0.5, 0.75, 1., 1.25, 1.5, 2.]",
+      "Cycles on click.",
+    ],
+  ]}
+/>

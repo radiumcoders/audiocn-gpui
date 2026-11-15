@@ -1,0 +1,76 @@
+---
+title: Decibels and levels
+description: The units audiocn uses, and the helpers in the audio core that convert between them.
+seoDescription: How audiocn for GPUI measures audio in dBFS, gain, peak and RMS, and the Rust helpers in audiocn::audio that convert and format decibels.
+---
+
+Audio levels span a huge range, so audio tools measure them in decibels (dB), a logarithmic scale. audiocn uses dB wherever audio engineers would.
+
+## dBFS
+
+**dBFS** means decibels relative to full scale. 0 dBFS is the loudest a digital signal can be; everything else is negative. Silence is `f32::NEG_INFINITY`.
+
+| Level               | What it sounds like                             |
+| ------------------- | ----------------------------------------------- |
+| 0 dBFS              | Full scale. Anything louder clips and distorts. |
+| −6 dBFS             | About half the amplitude                        |
+| −18 to −12 dBFS     | A good level for speech                         |
+| −60 dBFS            | The bottom of a typical meter                   |
+| `f32::NEG_INFINITY` | Digital silence                                 |
+
+Meters show dBFS. By default they cover −60 to 0 dBFS and colour three zones: green below −20, amber from −20, and red from −9.
+
+## dB as gain
+
+A fader's value is **gain** in dB: how much a channel is raised or lowered. 0 dB leaves the signal unchanged, −6 dB halves the amplitude, and +6 dB doubles it. Faders can reach `f32::NEG_INFINITY` to silence a channel completely.
+
+## Peak and RMS
+
+- **Peak** is the loudest single sample. It tells you whether you are about to clip.
+- **RMS** is the average power. It is closer to how loud something sounds.
+
+Speech usually peaks 10–15 dB above its RMS. A dual meter shows both.
+
+## Ballistics
+
+A meter that showed every sample would flicker too fast to read. Ballistics decide how it moves:
+
+| Preset | Attack | Release | Peak hold |
+| --- | --- | --- | --- |
+| `BallisticsPreset::Peak` | 15 ms | falls about 25 dB per second | 1.2 s |
+| `BallisticsPreset::Vu` | 300 ms | 300 ms | none |
+| `BallisticsPreset::Instant` | none | none | none |
+
+## The audio core
+
+`audiocn::audio` has the maths every component uses, ported from React's `lib/audio` with the same names in snake_case:
+
+```rust
+use audiocn::audio::decibels::{
+    DEFAULT_MAX_DB, DEFAULT_MIN_DB, FormatDbOptions, db_to_gain, db_to_level, format_db, gain_to_db,
+};
+
+db_to_gain(-6.); // 0.501
+gain_to_db(0.5); // -6.02
+db_to_level(-30., DEFAULT_MIN_DB, DEFAULT_MAX_DB); // 0.5, linear in dB over −60..0
+format_db(-12.34, FormatDbOptions::default()); // "−12.3 dB"
+format_db(f32::NEG_INFINITY, FormatDbOptions::default()); // "−∞ dB"
+```
+
+| Module | What it has |
+| --- | --- |
+| `decibels` | `db_to_gain`, `gain_to_db`, `db_to_level`, `level_to_db`, `clamp_db`, `format_db`, `peak_db`, `rms_db` |
+| `ballistics` | `create_ballistics`, `BALLISTICS`, `resolve_ballistics`, `BallisticsPreset` |
+| `zones` | `DEFAULT_ZONES`, `zone_for_db`, `CLIP_THRESHOLD_DB`, `CLIP_HOLD_MS` |
+| `taper` | `linear_taper`, `audio_taper`, `log_taper`, `resolve_taper` |
+| `bands` | `log_band_edges`, `bands_from_spectrum`, `resample_levels` |
+| `time` | `format_time` |
+| `frame_loop` | `now_ms`, the frame clock, and `FrameTask`, a loop that sleeps when idle |
+| `frame_source` | `create_frame_emitter`, `FrameEmitter`, `FrameSource` |
+| `types` | `MeterFrame`, `VisualFrame`, `ChannelLevel`, `MeterZone`, `Taper` |
+
+React's `subscribeFrame` has no port: GPUI already runs one frame loop, and components ask for the next frame with `window.request_animation_frame()`.
+
+## Volume in players
+
+Players are the one exception. `VolumeControl` and `AudioPlayer` use a 0..1 volume, the same as React's players and `HTMLMediaElement.volume`.

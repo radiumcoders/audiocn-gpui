@@ -1,0 +1,129 @@
+---
+title: AnalyserTap
+description: Meter and visual frame sources from any audio, measured off the audio thread.
+seoDescription: AnalyserTap is audiocn's native audio analyser for GPUI, behind the device feature. It turns samples into MeterFrame and VisualFrame sources for meters and visualizers.
+---
+
+`AnalyserTap` connects any audio to audiocn's meters and visualizers. It measures peak and RMS per channel and reduces the spectrum to frequency bands, on a shared analysis thread about 60 times a second.
+
+```bash
+cargo add audiocn --features device
+```
+
+## Usage
+
+Microphones, system audio, players and the mixer already run one, so you rarely build a tap yourself:
+
+```rust
+let microphone = use_microphone(
+    "mic",
+    MicrophoneOptions {
+        enabled: true,
+        analyser: AnalyserTapOptions { channels: AnalyserChannels::Stereo, ..Default::default() },
+        ..Default::default()
+    },
+    window,
+    cx,
+);
+
+div()
+    .child(LevelMeter::new("mic-level").aria_label("Microphone").source(microphone.meter.clone()))
+    .child(BarVisualizer::new("mic-bars").aria_hidden(true).source(microphone.visual.clone()))
+```
+
+For your own audio, write samples from the audio callback, or wrap an `AudioSource` so everything it plays is analysed on the way through:
+
+```rust
+use audiocn::io::{AnalyserTap, AnalyserTapOptions};
+
+let tap = AnalyserTap::new(AnalyserTapOptions::default(), sample_rate);
+let writer = tap.writer(); // move into the audio callback
+
+// on the audio thread:
+writer.write(&interleaved, channels);
+
+LevelMeter::new("engine").source(tap.meter())
+```
+
+<Callout title="Off the audio thread">
+  `write` only queues samples. The FFT and the frames run on the analysis
+  thread, so the audio callback never waits for them.
+</Callout>
+
+## Options
+
+`AnalyserTapOptions`:
+
+<PropsTable
+  rows={[
+    [
+      "fft_size",
+      "usize",
+      "2048",
+      "Analyser FFT size, a power of two in 32..32768.",
+    ],
+    ["smoothing", "f32", "0.3", "Analyser smoothing constant, 0..1."],
+    ["bands", "usize", "32", "Frequency bands per visual frame."],
+    [
+      "min_hz / max_hz",
+      "f32",
+      "40. / 16000.",
+      "Band range, spaced on a log scale.",
+    ],
+    ["history_size", "usize", "60", "Entries in the level history ring."],
+    ["history_interval_ms", "f64", "50.", "Time between history entries."],
+    [
+      "interval_ms",
+      "f64",
+      "0.",
+      "Minimum time between frames. 0 sends one every analysis tick.",
+    ],
+    [
+      "channels",
+      "AnalyserChannels",
+      "Mono",
+      "Stereo measures left and right separately.",
+    ],
+  ]}
+/>
+
+## Returns
+
+`AnalyserTap` methods:
+
+<PropsTable
+  rows={[
+    [
+      "meter",
+      "() -> FrameSource<MeterFrame>",
+      null,
+      "Peak and RMS per channel.",
+    ],
+    [
+      "visual",
+      "() -> FrameSource<VisualFrame>",
+      null,
+      "Bands, history, time-domain samples and peak.",
+    ],
+    [
+      "writer",
+      "() -> TapWriter",
+      null,
+      "The write end, for the audio callback.",
+    ],
+    [
+      "wrap",
+      "(source: impl AudioSource) -> TappedSource",
+      null,
+      "Analyses everything the source plays.",
+    ],
+    [
+      "dispose",
+      "()",
+      null,
+      "Stops analysing. The sources keep their last frame.",
+    ],
+  ]}
+/>
+
+`AnalyserTap::with_emitters` emits into emitters you already have, so readers keep their sources when the input changes. The React hook's `status` lives on what you analyse: a microphone's `status`, a player's state.

@@ -9,7 +9,9 @@
 //!
 //! On the web (`scripts/build-wasm.sh`), `index.html?demo=<slug>&variant=<name>&theme=light|dark`
 //! renders one example centred; without `variant` it renders that slug's whole docs page
-//! (no sidebar); without `demo` it shows the sidebar browser.
+//! (no sidebar); without `demo` it shows the sidebar browser. `&preset=ocean` applies one of
+//! audiocn.dev's colour themes. An embedded example posts `{ type: "audiocn-gpui:size", height }`
+//! to its parent whenever its height changes, so the docs site can size the iframe.
 
 #![cfg_attr(target_family = "wasm", no_main)]
 
@@ -288,6 +290,27 @@ fn variant_title(variant: &str) -> String {
 
 /// `p-10`, or the `className` a docs page gives its previews
 /// (`system-audio-mixer`: `p-4 sm:p-6`).
+/// Tells the embedding page (the docs site) how tall the example is.
+#[cfg(target_family = "wasm")]
+fn report_height(height: gpui::Pixels) {
+    use std::cell::Cell;
+    thread_local!(static LAST: Cell<f32> = const { Cell::new(-1.) });
+    let height = f32::from(height).ceil();
+    if LAST.with(|last| last.replace(height)) == height {
+        return;
+    }
+    let Some(parent) = web_sys::window().and_then(|w| w.parent().ok().flatten()) else {
+        return;
+    };
+    let message = js_sys::Object::new();
+    js_sys::Reflect::set(&message, &"type".into(), &"audiocn-gpui:size".into()).ok();
+    js_sys::Reflect::set(&message, &"height".into(), &height.into()).ok();
+    parent.post_message(&message, "*").ok();
+}
+
+#[cfg(not(target_family = "wasm"))]
+fn report_height(_height: gpui::Pixels) {}
+
 fn preview_padding(slug: &str) -> gpui::Pixels {
     match slug {
         "system-audio-mixer" => px(24.),
@@ -407,15 +430,38 @@ impl Render for Gallery {
         if let Some(variant) = self.only_variant.clone() {
             let demo = &demos::ALL[self.selected];
             let element = (demo.render)(&variant, window, cx);
+            let padding = preview_padding(demo.slug);
             return root
                 .flex()
                 .items_center()
                 .justify_center()
-                .p(preview_padding(demo.slug))
+                .p(padding)
                 .text_color(cx.theme().foreground.opacity(0.9))
                 .text_size(px(14.))
                 .line_height(relative(20. / 14.))
-                .children(element)
+                .child(
+                    // Sized like the docs preview's content box, so `w_full` examples still fill
+                    // it; the canvas reads its height for the embedding page.
+                    div()
+                        .relative()
+                        .w_full()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .children(element)
+                        .child(
+                            gpui::canvas(
+                                move |bounds, _, _| {
+                                    report_height(bounds.size.height + padding * 2.)
+                                },
+                                |_, _, _, _| {},
+                            )
+                            .absolute()
+                            .top_0()
+                            .left_0()
+                            .size_full(),
+                        ),
+                )
                 .into_any_element();
         }
 
@@ -456,6 +502,8 @@ struct Options {
     slug: Option<String>,
     variant: Option<String>,
     dark: bool,
+    /// `--preset` / `?preset=`: one of audiocn.dev's colour themes.
+    preset: Option<String>,
     sidebar: bool,
     /// `--playground [slug]` / `?playground=slug`: open the playground.
     playground: Option<String>,
@@ -478,6 +526,7 @@ fn main() {
             slug: flag("--demo"),
             variant: flag("--variant"),
             dark: flag("--theme").as_deref() == Some("dark"),
+            preset: flag("--preset"),
             sidebar: true,
             playground: args.iter().position(|a| a == "--playground").map(|i| {
                 args.get(i + 1)
@@ -516,6 +565,7 @@ pub fn start() {
             slug,
             variant: get("variant"),
             dark: get("theme").as_deref() == Some("dark"),
+            preset: get("preset"),
             playground: params
                 .as_ref()
                 .and_then(|p| p.get("playground"))
@@ -530,6 +580,7 @@ fn run(app: gpui::Application, options: Options) {
         slug,
         variant,
         dark,
+        preset,
         sidebar,
         playground,
         title,
@@ -551,7 +602,10 @@ fn run(app: gpui::Application, options: Options) {
         // With the `device` feature, `AudioPlayer::new(..).src(..)` plays for real.
         #[cfg(all(feature = "device", not(target_family = "wasm")))]
         audiocn::io::install_audio_player_backend(cx);
-        audiocn::theme::set_theme(if dark { Theme::dark() } else { Theme::light() }, cx);
+        audiocn::theme::set_theme(
+            playground::site_theme(preset.as_deref().unwrap_or("stone"), dark),
+            cx,
+        );
         cx.bind_keys([
             KeyBinding::new("tab", FocusNext, None),
             KeyBinding::new("shift-tab", FocusPrev, None),

@@ -1,0 +1,138 @@
+---
+title: Bar Visualizer
+description: A row of bars driven by frequency bands, with idle, loading and mirrored modes, painted by GPUI.
+seoDescription: A voice and audio bar visualizer for GPUI apps in Rust, driven by frequency bands, with idle, loading and mirrored modes. The audiocn Bar Visualizer for Zed's UI framework.
+---
+
+<GpuiExample demo="bar-visualizer" eager />
+
+## Installation
+
+```bash
+cargo add audiocn
+```
+
+## Usage
+
+```rust
+use audiocn::BarVisualizer;
+```
+
+```rust
+BarVisualizer::new("voice")
+    .aria_label("Voice activity")
+    .source(visual.clone())
+    .text_color(cx.theme().primary)
+```
+
+`BarVisualizer::new` takes an element id, which keeps the bar levels between renders. Bars take their color from the text color, so set it with `.text_color(..)`. Bars paint in one canvas on the animation frame.
+
+## Examples
+
+### Alignment
+
+<GpuiExample demo="bar-visualizer" variant="align" />
+
+### Idle and loading
+
+`.idle(..)` decides what bars do without a signal: `BarIdle::Static`, `Pulse` or `Wave`, from `audiocn::audio::bar_levels`. `.loading(true)` runs a sweep, for connecting or thinking states.
+
+<GpuiExample demo="bar-visualizer" variant="states" />
+
+### Mirrored
+
+<GpuiExample demo="bar-visualizer" variant="mirrored" />
+
+### Inside a badge
+
+<GpuiExample demo="bar-visualizer" variant="mini" />
+
+## Theming
+
+The React CSS variables are builder options here:
+
+| React | GPUI |
+| --- | --- |
+| `text-*` class | `.text_color(color)` |
+| `--bar-width` | `.bar_width(Pixels)`, maximum bar width, default 6px |
+| `--bar-gap` | `.bar_gap(Pixels)`, gap between bars, default 3px |
+| `--bar-radius` | `.bar_radius(Pixels)`, bar corner radius, default fully rounded |
+| `data-active` | `BarVisualizerActions::is_active(cx)`: the signal is above the floor |
+
+The bars are painted, not elements, so `data-loading` and `data-index` have no equivalent.
+
+## Accessibility
+
+The root has the AccessKit role `Image` and the label "Audio visualizer". Pass `.aria_label(..)` to describe what it shows, or `.aria_hidden(true)` when it is decorative next to a labelled meter.
+
+## API reference
+
+<PropsTable
+  rows={[
+    [
+      "new",
+      "(id: impl Into<ElementId>)",
+      null,
+      "Keeps the bar levels between renders.",
+    ],
+    [
+      "source",
+      "FrameSource<VisualFrame>",
+      null,
+      "Bars follow the frame's frequency bands. source_opt takes an Option.",
+    ],
+    [
+      "levels",
+      "impl Into<Vec<f32>>",
+      null,
+      "Levels, 0..1, for declarative use.",
+    ],
+    ["bar_count", "usize", "24", "Bands are resampled to fit."],
+    [
+      "align",
+      "BarVisualizerAlign",
+      "Center",
+      "Where bars grow from: Center, Start or End.",
+    ],
+    [
+      "mirrored",
+      "bool",
+      "false",
+      "Symmetric around the middle bar, lows in the centre.",
+    ],
+    ["min_level", "f32", "0.08", "Resting bar size, 0..1."],
+    [
+      "idle",
+      "BarIdle",
+      "Static",
+      "What bars do without a signal: Static, Pulse or Wave.",
+    ],
+    ["loading", "bool", "false", "Run a sweep animation."],
+    [
+      "orientation",
+      "Orientation",
+      "Horizontal",
+      "Vertical grows bars sideways.",
+    ],
+    [
+      "bar_width / bar_gap / bar_radius",
+      "Pixels",
+      "6px / 3px / fully rounded",
+      null,
+    ],
+    [
+      "config",
+      "AudioConfig",
+      null,
+      "Orientation from a surrounding container.",
+    ],
+    [
+      "actions",
+      "&BarVisualizerActions",
+      null,
+      "paint(levels, cx) and is_active(cx).",
+    ],
+    ["aria_label", "impl Into<SharedString>", '"Audio visualizer"', null],
+    ["aria_hidden", "bool", "false", "Leave it out of the accessibility tree."],
+  ]}
+/>

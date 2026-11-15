@@ -1,0 +1,76 @@
+---
+title: Pan Control
+description: Left and right balance for GPUI, with a fill from the centre and a centre detent.
+seoDescription: A pan control for GPUI apps in Rust, with left and right balance, a fill from the centre and a centre detent. The audiocn Pan Control for Zed's UI framework.
+---
+
+<GpuiExample demo="pan-control" eager />
+
+## Installation
+
+```bash
+cargo add audiocn
+```
+
+## Usage
+
+```rust
+use audiocn::PanControl;
+```
+
+```rust
+let view = cx.entity();
+
+PanControl::new("pan")
+    .value(self.pan)
+    .on_value_change(move |pan, _window, cx| {
+        view.update(cx, |this, cx| {
+            this.pan = pan;
+            cx.notify();
+        });
+    })
+```
+
+The value runs from −1 (left) to 1 (right). Dragging near the centre snaps to it, and double-clicking returns to it. `format_pan` turns a value into "L30", "C" or "R30", and `parse_pan` reads that text back.
+
+For a rotary pan, use a [Knob](/docs/gpui/components/knob) with `.min(-1.)`, `.max(1.)`, `.origin(0.)`, `.format(format_pan)` and `.parse(parse_pan)`:
+
+<GpuiExample demo="pan-control" variant="knob" />
+
+## Accessibility
+
+The thumb is focusable and takes arrow keys (Shift for `large_step`), Page Up, Page Down, Home and End; the knob example supports the same keys. Neither reports a role or value to assistive technology yet, so the React `aria-valuetext` has no equivalent. `describe_pan` still returns the same text, such as "30% left" or "Center", for your own announcements, while `format_pan` keeps the visible value short.
+
+## API reference
+
+<PropsTable
+  rows={[
+    [
+      "new",
+      "(id: impl Into<ElementId>)",
+      null,
+      "Keeps drag, focus and uncontrolled state between renders.",
+    ],
+    ["value", "f32", null, "−1 to 1."],
+    ["default_value", "f32", "0.", null],
+    ["on_value_change", "Fn(f32, &mut Window, &mut App)", null, null],
+    ["on_value_committed", "Fn(f32, &mut Window, &mut App)", null, null],
+    ["step", "f32", "0.05", null],
+    ["large_step", "f32", "0.25", "Shift+arrow, Page Up and Page Down."],
+    ["detent", "bool", "true", "Snap to the centre while dragging near it."],
+    [
+      "format",
+      "Fn(f32) -> String",
+      "format_pan",
+      "Kept for parity; nothing displays it yet.",
+    ],
+    ["size", "AudioSize", "Default", "Sm, Default or Lg."],
+    ["disabled", "bool", "false", null],
+    [
+      "config",
+      "AudioConfig",
+      null,
+      "Size and disabled from a surrounding strip. Explicit props win.",
+    ],
+  ]}
+/>

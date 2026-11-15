@@ -1,0 +1,26 @@
+---
+title: Blocks
+description: Complete, working assemblies, ready to drop into a GPUI app or to copy and make your own.
+seoTitle: Audio blocks for GPUI
+seoDescription: Build GPUI apps in Rust with complete audio blocks from the audiocn crate. Drop in a system mixer, music player, soundboard or microphone setup, wire it to native audio, then copy the module to customize it.
+---
+
+Blocks wire audiocn components together into complete assemblies. In React the shadcn CLI copies each one into your project. In GPUI they ship in the `audiocn` crate, so `cargo add audiocn` gives you all of them, re-exported at the crate root (`audiocn::MusicPlayer`, `audiocn::Soundboard`, ...).
+
+A block never opens a device itself. Each one has a few builder options, and an audio seam: pass the devices, statuses and meters from `audiocn::io` (behind the `device` feature) or your own engine, and handle its callbacks. Leave them out and the block runs on demo signals and simulated players, which is what the previews below do. When you need more than the options give you, copy the block's module into your app and edit it; each page says how.
+
+| Block | What it is |
+| --- | --- |
+| [System Audio Mixer](/docs/gpui/blocks/system-audio-mixer) | Microphone, system audio, music, sound pads and a master, in one mixer |
+| [Microphone Setup](/docs/gpui/blocks/mic-setup) | Device select, live preview, meter, gain, mute and a level check |
+| [System Audio Settings](/docs/gpui/blocks/system-audio-settings) | On/off capture, level, meter and what gets captured |
+| [Quick Audio Popover](/docs/gpui/blocks/quick-audio-popover) | Microphone and system audio controls behind one toolbar button |
+| [Soundboard](/docs/gpui/blocks/soundboard) | Sound pads with hotkeys, modes, volume and drag-and-drop |
+| [Music Player](/docs/gpui/blocks/music-player) | Playlist, waveform seek bar, shuffle, repeat and ducking |
+
+<Callout title="Demo audio">
+  The previews run in your browser as WebAssembly, where there is no native
+  audio: demo signals drive the meters, and tracks and pads play on simulated
+  players with no sound. In your app, pass your own tracks, sounds and audio
+  sources.
+</Callout>

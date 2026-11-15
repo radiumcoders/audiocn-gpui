@@ -1,0 +1,154 @@
+---
+title: Parameter Slider
+description: A labelled slider for GPUI with a numeric input, unit, marks and reset, for everything that is not a volume.
+seoDescription: A labelled parameter slider for GPUI apps in Rust, with a numeric input, units, log scale, marks and reset. The audiocn Parameter Slider for Zed's UI framework.
+---
+
+<GpuiExample demo="parameter-slider" eager />
+
+## Installation
+
+```bash
+cargo add audiocn
+```
+
+## Usage
+
+```rust
+use audiocn::{
+    ParameterSlider, ParameterSliderControl, ParameterSliderHeader, ParameterSliderInput,
+    ParameterSliderLabel,
+};
+```
+
+```rust
+let view = cx.entity();
+
+ParameterSlider::new("sync-offset")
+    .min(-1000.)
+    .max(1000.)
+    .step(5.)
+    .unit("ms")
+    .value(self.offset_ms)
+    .on_value_change(move |ms, _window, cx| {
+        view.update(cx, |this, cx| {
+            this.offset_ms = ms;
+            cx.notify();
+        });
+    })
+    .child(
+        ParameterSliderHeader::new()
+            .child(ParameterSliderLabel::new("Sync offset"))
+            .child(ParameterSliderInput::new()),
+    )
+    .child(ParameterSliderControl::new())
+```
+
+Use it for gain trims, delays, thresholds, times and frequencies. For volume, use [Fader](/docs/gpui/components/fader).
+
+## Anatomy
+
+```rust
+ParameterSlider::new("parameter")
+    .child(
+        ParameterSliderHeader::new()
+            .child(ParameterSliderLabel::new("Label"))
+            .child(ParameterSliderReset::new())
+            .child(ParameterSliderInput::new())
+            .child(ParameterSliderValue::new()),
+    )
+    .child(ParameterSliderControl::new())
+    .child(ParameterSliderMarks::new())
+    .child(ParameterSliderDescription::new("Description"))
+```
+
+`ParameterSlider::new` takes an element id, which keeps the drag, focus and uncontrolled state between renders. The parts read the slider's state while they render, so they work in any layout inside it.
+
+## Examples
+
+### Log scale with marks
+
+<GpuiExample demo="parameter-slider" variant="frequency" />
+
+## Theming
+
+The slider paints with the active `audiocn::Theme`, and every part implements `Styled`. The React data attributes have no GPUI equivalent:
+
+| React | GPUI |
+| --- | --- |
+| `data-modified` | Compare the value with `reset_value`. `ParameterSliderReset` already hides itself when they match |
+| `data-disabled` | `.disabled(true)` dims the slider |
+
+## Accessibility
+
+- `ParameterSliderLabel` names the slider thumb, or set `ParameterSliderControl::aria_label(..)`. The number input is exposed as a spin button with its value, but without the label's name.
+- `ParameterSliderDescription` is visible help text. It is not attached to the thumb in GPUI.
+- The thumb takes arrow keys (Shift for `large_step`), Page Up, Page Down, Home and End, like the [fader](/docs/gpui/components/fader#keyboard) without its Alt fine step. The number input takes Up and Down (Shift for `large_step`, Alt for 0.1) and typing; Enter or blur applies the text.
+- Drag the unit next to the input to scrub the value.
+
+## API reference
+
+<PropsTable
+  rows={[
+    [
+      "new",
+      "(id: impl Into<ElementId>)",
+      null,
+      "Keeps drag, focus and uncontrolled state between renders.",
+    ],
+    ["value", "f32", null, null],
+    ["default_value", "f32", "reset_value", null],
+    ["on_value_change", "Fn(f32, &mut Window, &mut App)", null, null],
+    [
+      "on_value_change_with_details",
+      "Fn(f32, ParameterChangeDetails, &mut Window, &mut App)",
+      null,
+      "details.reason: Drag, Keyboard, Input or Reset.",
+    ],
+    [
+      "on_value_committed",
+      "Fn(f32, &mut Window, &mut App)",
+      null,
+      "When a drag ends, after keyboard input, typing and reset.",
+    ],
+    ["min", "f32", "0.", null],
+    ["max", "f32", "100.", null],
+    ["step", "f32", "1.", null],
+    ["large_step", "f32", "10.", "Shift+arrow, Page Up and Page Down."],
+    [
+      "unit",
+      "impl Into<SharedString>",
+      null,
+      'Suffix such as "ms", "dB" or "Hz".',
+    ],
+    ["decimals", "usize", "from step", null],
+    ["scale", "ParameterScale", "Linear", "Log suits frequency and time."],
+    ["origin", "f32", "min", "Where the fill starts."],
+    [
+      "reset_value",
+      "f32",
+      "default_value or min",
+      "Restored by ParameterSliderReset and by double-clicking the thumb.",
+    ],
+    [
+      "marks",
+      "impl IntoIterator<Item = ParameterMark>",
+      null,
+      'Shown by ParameterSliderMarks. ParameterMark::new(2000.).label("2k").',
+    ],
+    ["format", "Fn(f32) -> String", null, null],
+    ["disabled", "bool", "false", null],
+    [
+      "config",
+      "AudioConfig",
+      null,
+      "Disabled from a surrounding container. Explicit props win.",
+    ],
+  ]}
+/>
+
+### ParameterSliderInput
+
+<PropsTable
+  rows={[["scrub", "bool", "true", "Drag the unit to change the value."]]}
+/>

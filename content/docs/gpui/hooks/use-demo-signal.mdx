@@ -1,0 +1,106 @@
+---
+title: use_demo_signal
+description: A synthetic speech, music, tone or noise signal as frame sources, for previews, prototypes and tests.
+seoDescription: use_demo_signal makes audiocn's GPUI meters and visualizers move without a microphone, with a repeatable speech, music, tone or noise signal as Rust frame sources.
+---
+
+`use_demo_signal` makes meters and visualizers move without a microphone. Every GPUI example on this site runs on it. The signal is repeatable for a given `seed`, and it only runs while the view that calls it renders.
+
+```bash
+cargo add audiocn
+```
+
+## Usage
+
+```rust
+use audiocn::LevelMeter;
+use audiocn::signal::demo_signal::{DemoSignalKind, DemoSignalOptions, use_demo_signal};
+
+impl Render for Preview {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let signal = use_demo_signal(
+            "signal",
+            DemoSignalOptions::kind(DemoSignalKind::Music).with_channels(2),
+            window,
+            cx,
+        );
+        LevelMeter::new("level").aria_label("Demo level").source(signal.meter)
+    }
+}
+```
+
+<GpuiExample demo="frame-source" eager />
+
+`use_demo_signal` keeps the signal in keyed state under its id, ticks it and requests the next animation frame. Call it from `render` with an id that is unique among its siblings.
+
+Pass a fader's value with `.with_gain_db(..)` to meter the signal after gain. Set `.with_playing(false)` to mute it. Options apply on every render without resetting the pattern, so gain changes preserve the signal's timing and sources, and boosted readings can exceed 0 dBFS.
+
+## Options
+
+`DemoSignalOptions` is a plain struct. Start from `DemoSignalOptions::kind(..)` or `Default::default()` and chain the `with_*` methods.
+
+<PropsTable
+  rows={[
+    [
+      "kind / with_kind",
+      "DemoSignalKind",
+      "Speech",
+      "What the signal sounds like: Speech, Music, Tone, Noise or Silence.",
+    ],
+    ["channels / with_channels", "usize", "1", "1 for mono, 2 for stereo."],
+    [
+      "gain_db / with_gain_db",
+      "f32",
+      "0.",
+      "Gain applied to meter and visual frames. f32::NEG_INFINITY silences the signal.",
+    ],
+    [
+      "seed / with_seed",
+      "f64",
+      "1.",
+      "Changes the pattern while keeping it repeatable.",
+    ],
+    ["bands / with_bands", "usize", "32", "Frequency bands per visual frame."],
+    [
+      "history_size / with_history_size",
+      "usize",
+      "60",
+      "Entries in the level history ring.",
+    ],
+    [
+      "history_interval_ms / with_history_interval_ms",
+      "f64",
+      "50.",
+      "Time between history entries.",
+    ],
+    [
+      "playing / with_playing",
+      "bool",
+      "true",
+      "When false the signal falls silent, so meters fall.",
+    ],
+  ]}
+/>
+
+## Returns
+
+`DemoSignalHandle`, cheap to clone:
+
+<PropsTable
+  rows={[
+    [
+      "meter",
+      "FrameSource<MeterFrame>",
+      null,
+      "Peak and RMS per channel, every animation frame.",
+    ],
+    [
+      "visual",
+      "FrameSource<VisualFrame>",
+      null,
+      "Bands, level history and time-domain samples.",
+    ],
+  ]}
+/>
+
+To change options, pass new ones on the next render. Outside a render, `DemoSignal::new(options)` gives the same sources with `meter_source()` and `visual_source()`; call `tick(now_ms())` once per frame and `configure(&options)` to change it.

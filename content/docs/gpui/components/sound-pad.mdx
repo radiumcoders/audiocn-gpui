@@ -1,0 +1,153 @@
+---
+title: Sound Pad
+description: A trigger pad with modes, a hotkey, playback progress and an accent colour, for GPUI.
+seoDescription: A sound trigger pad for GPUI apps in Rust, with one-shot, toggle, hold and loop modes, hotkeys, playback progress and an accent colour. The audiocn Sound Pad for Zed's UI framework.
+---
+
+<GpuiExample demo="sound-pad" eager />
+
+## Installation
+
+```bash
+cargo add audiocn
+```
+
+To play the sounds natively with `audiocn::io::use_sound`, add the `device` feature:
+
+```bash
+cargo add audiocn --features device
+```
+
+## Usage
+
+```rust
+use audiocn::io::{SoundOptions, use_sound};
+use audiocn::{SoundPad, SoundPadLabel, SoundPadProgress, SoundPadShortcut};
+```
+
+```rust
+let airhorn = use_sound("airhorn", Some("/sounds/airhorn.mp3"), SoundOptions::default(), window, cx);
+
+SoundPad::new("airhorn")
+    .hotkey("1")
+    .playing(airhorn.is_playing())
+    .on_trigger({
+        let airhorn = airhorn.clone();
+        move |_, _| airhorn.play()
+    })
+    .child(SoundPadLabel::new().child("Airhorn"))
+    .child(SoundPadShortcut::new())
+    .child(SoundPadProgress::new().source(airhorn.progress()))
+```
+
+The pad plays nothing itself. It reports triggers; [`use_sound`](/docs/gpui/hooks/use-sound) or your own engine does the playback. `SoundPad::new` takes an element id, which keeps the pad's focus and pressed state between renders.
+
+## Anatomy
+
+```rust
+SoundPadGrid::new("pads").child(
+    SoundPad::new("airhorn")
+        .child(SoundPadIcon::new().icon(IconName::Megaphone))
+        .child(SoundPadLabel::new())
+        .child(SoundPadShortcut::new())
+        .child(SoundPadProgress::new()),
+)
+```
+
+## Modes
+
+| Mode                    | Behaviour                                     |
+| ----------------------- | --------------------------------------------- |
+| `SoundPadMode::OneShot` | Every press triggers; pressing again restarts |
+| `SoundPadMode::Toggle`  | Press to start, press again to stop           |
+| `SoundPadMode::Hold`    | Plays while held                              |
+| `SoundPadMode::Loop`    | Like toggle, and marks the pad as looping     |
+
+A second press in toggle and loop modes, and the release in hold mode, calls `on_stop`.
+
+## Examples
+
+### A grid with hotkeys
+
+Press 1–8 while the grid has focus. Whoosh toggles and the drum roll plays only while held.
+
+<GpuiExample demo="sound-pad" variant="grid" />
+
+## Theming
+
+The pad paints with the active `audiocn::Theme`, tinted with its accent. The React variables and attributes are builder options here:
+
+| React | GPUI |
+| --- | --- |
+| `--pad-accent` | `SoundPad::accent(Hsla)`, default `theme.primary`. `audiocn::theme::oklch(l, c, h)` builds one |
+| `--pad-progress` | `SoundPadProgress::value(f32)` or `::source(FrameSource<f32>)`, 0..1 |
+| `--pad-min-width` | `SoundPadGrid::pad_min_width(px)`, the narrowest pad before the grid drops a column. Default 88px |
+| `--pad-gap` | `SoundPadGrid::pad_gap(px)`, default 8px |
+| `data-playing`, `data-pressed`, `data-mode`, `data-loading` | The `playing`, `mode` and `loading` you pass in; the pad tracks pressed itself |
+
+## Accessibility
+
+A pad is focusable and has the button role. In toggle and loop modes it reports its pressed state. Enter and Space press it, and in hold mode they play until released. The grid moves focus between pads with the arrow keys. GPUI has no `aria-keyshortcuts`, so `SoundPadShortcut` is the only place the hotkey shows. Global hotkeys never fire while someone is typing in a field.
+
+## API reference
+
+### SoundPad
+
+<PropsTable
+  rows={[
+    [
+      "new",
+      "(id: impl Into<ElementId>)",
+      null,
+      "Keeps focus and pressed state between renders.",
+    ],
+    ["on_trigger", "Fn(&mut Window, &mut App)", null, null],
+    ["on_stop", "Fn(&mut Window, &mut App)", null, null],
+    ["playing", "bool", "false", null],
+    ["mode", "SoundPadMode", "OneShot", "OneShot, Toggle, Hold or Loop."],
+    [
+      "hotkey",
+      "impl Into<SharedString>",
+      null,
+      "Active when the grid enables hotkeys.",
+    ],
+    ["loading", "bool", "false", "The sound is not ready yet."],
+    ["accent", "Hsla", "theme.primary", null],
+    ["variant", "SoundPadVariant", "Default", "Default, Outline or Ghost."],
+    ["size", "SoundPadSize", "Default", "Sm, Default or Lg."],
+    ["disabled", "bool", "false", null],
+  ]}
+/>
+
+### SoundPadGrid
+
+<PropsTable
+  rows={[
+    ["new", "(id: impl Into<ElementId>)", null, null],
+    [
+      "columns",
+      "usize",
+      "4",
+      "The most columns. The grid drops columns to keep pads at least pad_min_width wide.",
+    ],
+    ["hotkeys", "bool", "false", "Listen for pad hotkeys."],
+    [
+      "hotkey_scope",
+      "HotkeyScope",
+      "Focus",
+      "Global listens in the whole window. There a hotkey press is a tap, so hold pads stop at once.",
+    ],
+    ["pad_min_width", "Pixels", "88px", null],
+    ["pad_gap", "Pixels", "8px", null],
+  ]}
+/>
+
+### SoundPadProgress
+
+<PropsTable
+  rows={[
+    ["value", "f32", null, "0..1, declarative."],
+    ["source", "FrameSource<f32>", null, "Smooth progress with no renders."],
+    ["variant", "SoundPadProgressVariant", "Bar", "Bar, Fill or Ring."],
+  ]}
+/>

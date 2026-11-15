@@ -1,0 +1,127 @@
+---
+title: Microphone Setup
+description: Choose and check a microphone, with a live preview, a meter, gain, mute and a level check, as a GPUI block.
+seoDescription: A microphone setup block for GPUI apps in Rust, with a device select, live waveform, level meter, gain, mute and a three-second level check. Wire it to a native microphone with the audiocn device feature.
+---
+
+<GpuiExample demo="mic-setup" eager />
+
+## Installation
+
+```bash
+cargo add audiocn
+```
+
+The block is part of the crate: `audiocn::MicSetup`. To list and open real microphones, add the `device` feature:
+
+```bash
+cargo add audiocn --features device
+```
+
+## What it does
+
+- Lists microphones and asks for access when needed.
+- Shows a scrolling waveform and a meter with peak hold, a scale and a clip light.
+- Reports gain (−24 to +24 dB) and mute. Apply them to the microphone before its meter, with `MicrophoneHandle::set_gain_db` and `set_muted`, so the meter shows what the gain does.
+- "Check level" listens for three seconds and says whether the level is good, too quiet, too loud or silent.
+
+The microphone opens when the user clicks "Turn on microphone", or on first render with `.auto_start(true)`. The block calls `on_start` then; open the device there. Without a status and sources, a speech demo signal stands in for the microphone, which is what the preview shows.
+
+```rust
+use audiocn::io::{AnalyserTapOptions, MicrophoneOptions, use_audio_devices, use_microphone};
+use audiocn::{AudioDeviceKind, MicSetup};
+
+let devices = use_audio_devices("mic/devices", AudioDeviceKind::AudioInput, window, cx);
+let mic = use_microphone(
+    "mic/microphone",
+    MicrophoneOptions {
+        device_id: self.device_id.as_ref().map(ToString::to_string),
+        enabled: self.started,
+        analyser: AnalyserTapOptions { history_size: 120, ..Default::default() },
+        ..Default::default()
+    },
+    window,
+    cx,
+);
+if let Some(handle) = &mic.handle {
+    handle.set_gain_db(self.gain_db);
+    handle.set_muted(self.muted);
+}
+
+let view = cx.entity();
+let (on_start, on_gain) = (view.clone(), view.clone());
+
+MicSetup::new("mic")
+    .devices(devices.devices.clone())
+    .permission(devices.permission)
+    .status(mic.status.into())
+    .meter_source(mic.meter.clone())
+    .visual_source(mic.visual.clone())
+    .gain_db(self.gain_db)
+    .muted(self.muted)
+    .on_start(move |_, cx| on_start.update(cx, |this, cx| {
+        this.started = true;
+        cx.notify();
+    }))
+    .on_gain_change(move |db, _, cx| on_gain.update(cx, |this, cx| {
+        this.gain_db = db;
+        cx.notify();
+    }))
+    // .device_id / .on_device_change and .on_muted_change work the same way.
+```
+
+## Props
+
+<PropsTable
+  rows={[
+    [
+      "new",
+      "(id: impl Into<ElementId>)",
+      null,
+      "Keeps the block's own state between renders.",
+    ],
+    [
+      "device_id / on_device_change",
+      "Option<SharedString>",
+      null,
+      "Optional control of the selected device.",
+    ],
+    ["gain_db / on_gain_change", "f32", "0.", null],
+    ["muted / on_muted_change", "bool", "false", null],
+    ["auto_start", "bool", "false", "Open the microphone on first render."],
+    [
+      "devices / loading",
+      "impl IntoIterator<Item = AudioDevice> / bool",
+      "none / false",
+      "Microphones for the select, from use_audio_devices.",
+    ],
+    [
+      "permission / on_request_permission",
+      "AudioPermission / Fn(&mut Window, &mut App)",
+      "Granted",
+      null,
+    ],
+    [
+      "status",
+      "MicrophoneStatus",
+      "the demo",
+      "Capture state, e.g. use_microphone(..).status.into().",
+    ],
+    [
+      "meter_source / visual_source",
+      "FrameSource<MeterFrame> / FrameSource<VisualFrame>",
+      "the demo signal",
+      "The microphone's analyser, after gain and mute.",
+    ],
+    [
+      "on_start",
+      "Fn(&mut Window, &mut App)",
+      null,
+      "Open the device. Fires once when capture turns on.",
+    ],
+  ]}
+/>
+
+## Files
+
+The block lives in `src/blocks/mic_setup.rs` of the `audiocn` crate. To change more than the builder options allow, copy the file into your app, rename the `crate::` paths to `audiocn::`, and edit it. One import is private to the crate: the `TextSize` helpers (`text_xs_()`, `text_sm_()`, ...), which set a font size and line height. Replace them with GPUI's `.text_size(px(12.)).line_height(px(16.))` and so on.

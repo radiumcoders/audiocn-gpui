@@ -1,0 +1,98 @@
+---
+title: TapTempo
+description: Tap tempo with a rolling average and idle reset.
+seoDescription: TapTempo is audiocn's tap tempo state for GPUI and plain Rust, with a four-interval rolling average, an idle reset and whole BPM values. It powers TempoControl.
+---
+
+`TapTempo` powers the [tempo control](/docs/gpui/components/tempo-control). Use it with your own button, sound pad or key binding.
+
+```bash
+cargo add audiocn
+```
+
+## Usage
+
+```rust
+use audiocn::audio::frame_loop::now_ms;
+use audiocn::signal::tap_tempo::{TapTempo, TapTempoOptions};
+
+let mut tempo = TapTempo::new(TapTempoOptions { default_value: 120., ..Default::default() });
+```
+
+Call `tempo.tap(now_ms())` once per beat. The second tap produces a BPM value; later taps average the last four intervals. A gap longer than two seconds starts a fresh sequence without changing the current value on its first tap. Taps less than 80 ms apart are ignored.
+
+BPM values are always whole numbers. Tapped tempos, `value`, `default_value` and `set_value()` round to the nearest integer.
+
+React calls `onValueChange` and `onValueCommitted` for you. Here `tap` returns a `TapOutcome` and `set_value` returns the new BPM, so you forward them yourself:
+
+```rust
+let outcome = self.tempo.tap(now_ms());
+if let Some(bpm) = outcome.changed {
+    self.bpm = bpm;
+    cx.notify();
+}
+```
+
+Call `tap()` from your app's key bindings or action handlers. Keep `TapTempo` in your view, and call `set_options` on every render when its options come from props.
+
+## Options
+
+`TapTempoOptions`:
+
+<PropsTable
+  rows={[
+    [
+      "value / default_value",
+      "Option<f32> / f32",
+      "None / 120.",
+      "BPM. value: None makes the tempo uncontrolled.",
+    ],
+    ["min / max", "f32", "30. / 600.", "Positive integer BPM bounds."],
+    [
+      "tap_timeout",
+      "f64",
+      "2000.",
+      "Idle milliseconds before a new sequence. Set at least 60000 / min for slower tempos.",
+    ],
+    [
+      "disabled / read_only",
+      "bool",
+      "false",
+      "Prevent taps and value changes.",
+    ],
+  ]}
+/>
+
+## Returns
+
+`TapTempo` methods, and the `TapOutcome` of a tap:
+
+<PropsTable
+  rows={[
+    [
+      "value",
+      "() -> f32",
+      null,
+      "Current integer BPM, clamped to the configured range.",
+    ],
+    [
+      "tap",
+      "(now_ms: f64) -> TapOutcome",
+      null,
+      "Record a tap. outcome.changed is the BPM to report as a change with reason Tap, outcome.committed the BPM to commit, including an unchanged value.",
+    ],
+    [
+      "set_value",
+      "(bpm: f32) -> Option<f32>",
+      null,
+      "Change BPM and clear tap history. Returns the BPM to report, or None when nothing changed.",
+    ],
+    ["reset_taps", "()", null, "Clear tap history without changing BPM."],
+    [
+      "tap_count",
+      "() -> u32",
+      "0",
+      "Accepted taps, including the first. Use it to restart visual feedback.",
+    ],
+  ]}
+/>

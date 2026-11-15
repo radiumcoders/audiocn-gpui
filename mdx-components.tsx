@@ -8,6 +8,8 @@ import type { ComponentProps } from "react";
 
 import { ComponentPreview } from "@/components/docs/component-preview";
 import { ComponentSource } from "@/components/docs/component-source";
+import { GpuiExample } from "@/components/docs/gpui-example";
+import { GpuiPreview } from "@/components/docs/gpui-preview";
 import { InstallCommand } from "@/components/docs/install-command";
 import { PropsTable } from "@/components/docs/props-table";
 
@@ -18,6 +20,8 @@ export const getMDXComponents = (
   Callout,
   ComponentPreview,
   ComponentSource,
+  GpuiExample,
+  GpuiPreview,
   InstallCommand: (props: ComponentProps<typeof InstallCommand>) => (
     <InstallCommand className="my-4" {...props} />
   ),

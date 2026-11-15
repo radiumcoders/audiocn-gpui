@@ -1,0 +1,105 @@
+---
+title: Soundboard
+description: Sound pads with hotkeys, modes, volume, stop all and drag-and-drop, as a GPUI block.
+seoDescription: A soundboard block for GPUI apps in Rust, with sound pads, hotkeys, one-shot, toggle, hold and loop modes, per-pad volume, a master volume, stop all, undo and file drop. Play the clips natively with the audiocn device feature.
+---
+
+<GpuiExample demo="soundboard" eager />
+
+## Installation
+
+```bash
+cargo add audiocn
+```
+
+The block is part of the crate: `audiocn::Soundboard`. To play the clips natively with `audiocn::io::Sound`, add the `device` feature:
+
+```bash
+cargo add audiocn --features device
+```
+
+## What it does
+
+- Pads play on click or with hotkeys 1–9 anywhere in the window, except while typing in a field. Hotkeys can be turned off.
+- Right-click a pad to change its mode (one shot, toggle, hold, loop), its volume, or remove it.
+- Removing a pad shows an inline Undo action that restores it in its original position. The most recent removal stays undoable until another pad is removed.
+- A master volume and a "Stop all" button.
+- Drop audio files onto the board, or use the Add pad, which opens the system file picker, to add sounds. A file becomes a pad whose `src` is its path; the board does not decode or copy it.
+- Inline status messages announce additions, rejected or duplicate files, removals and stopping playback. There is no global toast provider.
+
+The board opens no audio device. By default each pad plays on a simulated player of its `duration`, which drives the playing state and the progress bar with no sound; the preview works this way. To play for real, give each pad a `SoundboardVoice` with your clip's state and play it from `on_play` and `on_stop`:
+
+```rust
+use audiocn::io::{Sound, SoundOptions};
+use audiocn::{Soundboard, SoundboardSound, SoundboardVoice};
+
+// One clip per pad, e.g. Sound::new(&pad.src, SoundOptions::default()).
+let clips: Rc<HashMap<SharedString, Sound>> = self.clips.clone();
+let sounds = self.sounds.iter().map(|pad| {
+    let clip = &clips[&pad.id];
+    pad.clone().voice(SoundboardVoice {
+        playing: clip.is_playing(),
+        loading: clip.is_loading(),
+        progress: Some(clip.progress()),
+    })
+});
+let (play, stop) = (clips.clone(), clips);
+let view = cx.entity();
+
+Soundboard::new("board")
+    .sounds(sounds.collect())
+    .on_sounds_change(move |sounds, _, cx| view.update(cx, |this, cx| this.set_sounds(sounds, cx)))
+    .on_play(move |pad, _, _| play[&pad.id].play())
+    .on_stop(move |id, _, _| stop[id].stop())
+    .on_output_gain(|gain, _, _| bus.set_gain(gain))
+```
+
+`on_play` fires for simulated pads too, so you can also keep the simulator for the progress bar and only start a clip there. Instead of React's `output` node, `on_output_gain` reports the master gain (0 while muted, `volume²` otherwise) for the bus your clips play into, and each pad's `volume` (0..1) is yours to apply to its clip. Re-render while clips play so the pads follow them; `audiocn::io::use_sound` does that for a single clip.
+
+## Props
+
+<PropsTable
+  rows={[
+    [
+      "new",
+      "(id: impl Into<ElementId>)",
+      null,
+      "Keeps the board's own state between renders.",
+    ],
+    [
+      "sounds / default_sounds",
+      "Vec<SoundboardSound>",
+      "vec![]",
+      "SoundboardSound::new(id, label, src) with .hotkey(..), .mode(..), .volume(..), .accent(..), .duration(..) and .voice(..).",
+    ],
+    [
+      "on_sounds_change",
+      "Fn(Vec<SoundboardSound>, &mut Window, &mut App)",
+      null,
+      "Called when sounds are added, edited or removed.",
+    ],
+    [
+      "on_play",
+      "Fn(&SoundboardSound, &mut Window, &mut App)",
+      null,
+      "A pad asked to play.",
+    ],
+    [
+      "on_stop",
+      "Fn(&SharedString, &mut Window, &mut App)",
+      null,
+      "A pad asked to stop, including each pad on Stop all.",
+    ],
+    [
+      "on_output_gain",
+      "Fn(f32, &mut Window, &mut App)",
+      null,
+      "The master gain, in place of React's output.",
+    ],
+    ["columns", "usize", "4", "The most columns; fewer on narrow windows."],
+  ]}
+/>
+
+## Files
+
+The block lives in `src/blocks/soundboard.rs` of the `audiocn` crate. To change more than the builder options allow, copy the file into your app, rename the `crate::` paths to `audiocn::`, and edit it. Two imports are private to the crate: the `TextSize` helpers (`text_xs_()`, `text_sm_()`, ...), which set a font size and line height, and `ring_shadow(width, color)`, a spread-only `BoxShadow`. Replace them with GPUI's `.text_size(..).line_height(..)` and a `BoxShadow` with `spread_radius: px(width)`.

@@ -481,6 +481,7 @@ dependencies = [
  "gpui-pre",
  "gpui-pre-platform",
  "gpui-pre-web",
+ "js-sys",
  "log",
  "wasm-bindgen",
  "web-sys",

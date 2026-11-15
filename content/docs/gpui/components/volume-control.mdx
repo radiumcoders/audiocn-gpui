@@ -1,0 +1,125 @@
+---
+title: Volume Control
+description: A simple volume slider with a mute button, for players in GPUI.
+seoDescription: A volume slider with a mute button for GPUI apps in Rust, with a perceptual curve and level-aware speaker icons. The audiocn Volume Control for Zed's UI framework.
+---
+
+<GpuiExample demo="volume-control" eager />
+
+## Installation
+
+```bash
+cargo add audiocn
+```
+
+## Usage
+
+```rust
+use audiocn::VolumeControl;
+```
+
+```rust
+let (on_volume, on_muted) = (cx.entity(), cx.entity());
+
+VolumeControl::new("volume")
+    .value(self.volume)
+    .on_value_change(move |volume, _, cx| {
+        on_volume.update(cx, |this, cx| {
+            this.volume = volume;
+            cx.notify();
+        })
+    })
+    .muted(self.muted)
+    .on_muted_change(move |muted, _, cx| {
+        on_muted.update(cx, |this, cx| {
+            this.muted = muted;
+            cx.notify();
+        })
+    })
+```
+
+Unlike the mixer components, the volume here runs from 0 to 1, the same as `HTMLMediaElement.volume` in the React version. The `VolumeCurve::Perceptual` curve gives the slider more travel at low volumes, where ears are most sensitive. Unmuting at zero restores the last audible volume.
+
+Leave out `.value(..)` and `.muted(..)` for an uncontrolled control, and set `.default_value(..)` and `.default_muted(..)` instead.
+
+## Anatomy
+
+```rust
+VolumeControl::new("volume")
+    .child(VolumeControlMute::new())
+    .child(VolumeControlSlider::new())
+    .child(VolumeControlValue::new())
+```
+
+A control with no children renders `VolumeControlMute` and `VolumeControlSlider`. The parts read the control's state while they render, so they must sit inside a `VolumeControl`.
+
+## Examples
+
+### In a popover
+
+<GpuiExample demo="volume-control" variant="popover" />
+
+## Theming
+
+React sets `data-level` on the mute button so icons can switch with CSS. In GPUI, `VolumeControlMute::content` builds the button's children from a `VolumeControlMuteState`, whose `level` is `VolumeLevel::Muted`, `Low`, `Medium` or `High`, as in the first example:
+
+```rust
+VolumeControlMute::new().content(|state| {
+    Icon::new(match state.level {
+        VolumeLevel::Muted => IconName::SpeakerX,
+        VolumeLevel::Low => IconName::SpeakerNone,
+        VolumeLevel::Medium => IconName::SpeakerLow,
+        VolumeLevel::High => IconName::SpeakerHigh,
+    })
+    .into_any_element()
+})
+```
+
+Without children or `content`, the button shows the text "Mute" or "Unmute". Colours come from the active `audiocn::Theme`.
+
+## API reference
+
+<PropsTable
+  rows={[
+    [
+      "new",
+      "(id: impl Into<ElementId>)",
+      null,
+      "Keeps drag, focus and uncontrolled state between renders.",
+    ],
+    ["value", "f32", null, "0..1."],
+    ["default_value", "f32", "1.", null],
+    ["on_value_change", "Fn(f32, &mut Window, &mut App)", null, null],
+    ["on_value_committed", "Fn(f32, &mut Window, &mut App)", null, null],
+    ["muted", "bool", null, null],
+    ["default_muted", "bool", "false", null],
+    ["on_muted_change", "Fn(bool, &mut Window, &mut App)", null, null],
+    ["step", "f32", "0.05", "Slider step, in slider position."],
+    [
+      "curve",
+      "VolumeCurve",
+      "Perceptual",
+      "How slider position maps to volume: Linear or Perceptual.",
+    ],
+    [
+      "orientation",
+      "Orientation",
+      "Horizontal",
+      "Vertical stacks the slider above the mute button.",
+    ],
+    ["size", "AudioSize", "config.size, else Default", "Sm, Default or Lg."],
+    ["disabled", "bool", "config.disabled", null],
+    [
+      "config",
+      "AudioConfig",
+      null,
+      "Size and disabled from a container, as from React's AudioConfigProvider.",
+    ],
+    [
+      "child / children",
+      "VolumeControlMute, VolumeControlSlider, VolumeControlValue or any element",
+      null,
+      null,
+    ],
+  ]}
+/>

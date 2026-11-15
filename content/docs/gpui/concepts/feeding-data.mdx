@@ -1,0 +1,110 @@
+---
+title: Feeding data
+description: Every meter and visualizer accepts levels three ways, so it fits any audio source.
+seoDescription: Feed audiocn's GPUI meters and visualizers from a FrameSource, from plain values or through an actions handle, with MeterFrame and VisualFrame from any thread.
+---
+
+audiocn components never open a microphone or connect to an audio device themselves. They receive levels, and they accept them three ways.
+
+## 1. A source
+
+A **frame source** is a shared slot that holds the latest frame:
+
+```rust
+pub struct FrameSource<T> { /* Arc */ }
+
+impl<T> FrameSource<T> {
+    pub fn version(&self) -> u64;
+    pub fn with_latest<R>(&self, f: impl FnOnce(Option<&T>) -> R) -> R;
+}
+```
+
+Pass one to `.source(..)` and the component reads the latest frame while it paints, and calls `window.request_animation_frame()` while it moves. This is the fastest way, and the one to use for live audio. A meter that has settled or gone quiet stops requesting frames and checks the source's version on a cheap timer, so the next frame wakes it and an idle mixer costs almost nothing.
+
+```rust
+let mic = use_microphone("mic", MicrophoneOptions { enabled: true, ..Default::default() }, window, cx);
+
+LevelMeter::new("mic-level").source(mic.meter.clone());
+BarVisualizer::new("mic-bars").source(mic.visual.clone());
+```
+
+The `use_*` functions in this crate return sources, and so can your own code. `FrameSource` and `FrameEmitter` are `Send + Sync` and cheap to clone, so emit from any thread:
+
+```rust
+use audiocn::{MeterFrame, create_frame_emitter};
+
+let levels = create_frame_emitter::<MeterFrame>();
+let source = levels.source();
+
+std::thread::spawn(move || {
+    for frame in socket_frames() {
+        levels.emit(frame);
+    }
+});
+
+LevelMeter::new("remote").source(source.clone())
+```
+
+## 2. Values
+
+For data that arrives slowly, such as once a second from a server, pass plain values. The meter's ballistics still move it smoothly between updates.
+
+```rust
+LevelMeter::new("server").peak_db(-9.1).rms_db(-18.)
+LevelMeter::new("stereo").channels([ChannelLevel::new(-12.), ChannelLevel::new(-14.)])
+```
+
+## 3. A handle
+
+If you already run your own frame loop, paint through a `LevelMeterActions` handle. Keep it in your view and pass a clone to the meter:
+
+```rust
+struct Monitor {
+    meter: LevelMeterActions,
+}
+
+// in your loop:
+self.meter.paint(MeterFrame { channels: levels }, cx);
+
+// in render:
+LevelMeter::new("monitor").actions(self.meter.clone())
+```
+
+## Frames
+
+```rust
+pub struct ChannelLevel {
+    pub peak_db: f32,
+    pub rms_db: Option<f32>,
+}
+
+pub struct MeterFrame {
+    pub channels: Vec<ChannelLevel>,
+}
+
+pub struct VisualFrame {
+    pub bands: Vec<f32>,                       // 0..1 per frequency band
+    pub history: Vec<f32>,                     // ring of recent levels, 0..1
+    pub history_start: usize,
+    pub history_length: usize,
+    pub history_updated_at: Option<f64>,       // newest history entry's time, in ms
+    pub history_interval_ms: Option<f64>,      // minimum wait between history entries
+    pub history_previous_level: Option<f32>,   // last entry removed from a full ring
+    pub time_domain: Option<Vec<f32>>,         // −1..1 samples
+    pub peak_db: f32,
+}
+```
+
+`MeterFrame::mono(level)` and `MeterFrame::stereo(left, right)` build the common cases, and `ChannelLevel::with_rms(peak, rms)` adds an RMS level.
+
+A source keeps only its latest frame. Components read it in place with `with_latest`; call `latest()` to get a clone you can keep.
+
+For smooth `LiveWaveform` scrolling, set `history_updated_at` and a positive `history_interval_ms`. Use the frame clock, `audiocn::audio::frame_loop::now_ms()`. Set the timestamp when you add a history entry, and set `history_interval_ms` to the minimum wait between entries. The drawing keeps a short buffer of history snapshots and uses their timestamps to follow the actual sample cadence. Playback runs twice that interval behind the source, 100 ms with the default settings. Set `history_previous_level` to the last value removed from a full ring so it can scroll out of view. `audiocn::audio::history::append_history` does all of this for you.
+
+The built-in demo and analyser sources set these fields for you. After a pause, they append only the new sample and restart the history clock. They do not fill missed intervals with stale levels. Custom sources that leave the timing fields at `None` still work, but their history moves one step per update.
+
+GPUI has no update phase to register for: emit into a `FrameEmitter` whenever your engine has a frame, and painters read the latest one on their next frame.
+
+## In GPUI state
+
+When you need a level in your view, for a label or a warning, use [`use_level`](/docs/gpui/hooks/use-level). It samples a source a few times a second and re-renders only when the level changes.

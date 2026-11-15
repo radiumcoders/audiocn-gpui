@@ -1,0 +1,105 @@
+---
+title: use_system_audio
+description: Capture what the computer is playing through the sound server's monitor source.
+seoDescription: use_system_audio captures system audio in GPUI with audiocn's device feature, through the PulseAudio or PipeWire monitor source, with meter and visual frame sources.
+---
+
+```bash
+cargo add audiocn --features device
+```
+
+## Usage
+
+```rust
+use audiocn::io::{SystemAudioOptions, use_system_audio};
+use audiocn::io::system_audio::is_supported;
+
+let system = use_system_audio("system", SystemAudioOptions::default(), window, cx);
+
+div()
+    .child(Spectrum::new("system-spectrum").source(system.visual_source()))
+    .child(
+        Button::new("capture")
+            .child("Capture system audio")
+            .disabled(!is_supported())
+            .on_click(move |_, _, _| system.start()),
+    )
+```
+
+There is no screen-share picker natively. PulseAudio and PipeWire (through `pipewire-pulse`) expose a **monitor source** for each output, such as "Monitor of Built-in Audio", and `start()` opens the monitor of the default output like a microphone. Pass `device_id` to capture another monitor; `audiocn::io::system_audio::monitor_devices()` lists them.
+
+<Callout type="warn" title="Platform support varies">
+  Plain ALSA has no monitor sources unless a loopback device is set up. On macOS
+  and Windows, only a loopback input with "monitor" in its name is found; WASAPI
+  loopback is not wired up. Always handle the `Unsupported` status.
+</Callout>
+
+## Options
+
+`SystemAudioOptions`:
+
+<PropsTable
+  rows={[
+    [
+      "system_audio",
+      "bool",
+      "true",
+      "The whole system's audio. Natively always the case.",
+    ],
+    [
+      "prefer_current_tab",
+      "bool",
+      "false",
+      "Accepted for parity; there are no tabs natively.",
+    ],
+    [
+      "device_id",
+      "Option<String>",
+      "None",
+      "Capture this monitor instead of the default output's.",
+    ],
+    [
+      "analyser",
+      "AnalyserTapOptions",
+      "AnalyserTapOptions::default()",
+      "The analyser behind the meter and visual sources.",
+    ],
+  ]}
+/>
+
+## Returns
+
+`SystemAudio`, cheap to clone:
+
+<PropsTable
+  rows={[
+    [
+      "meter_source / visual_source",
+      "() -> FrameSource<…>",
+      null,
+      "The captured audio's meter and visual frames.",
+    ],
+    [
+      "stream",
+      "() -> Option<MicrophoneHandle>",
+      null,
+      "The capture, to feed other nodes with AudioInput::Microphone.",
+    ],
+    [
+      "status",
+      "() -> SystemAudioStatus",
+      null,
+      "Idle, Prompting, Active, Denied, Ended or Unsupported. Ended means the output went away.",
+    ],
+    ["error", "() -> Option<AudioIoError>", null, "The last error."],
+    [
+      "start",
+      "()",
+      null,
+      "Start capturing. Returns at once: Prompting, then Active.",
+    ],
+    ["stop", "()", null, "Stop capturing."],
+  ]}
+/>
+
+`is_supported()` says whether a monitor source exists. `NoAudio` is kept for parity and never happens natively.

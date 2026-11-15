@@ -1,0 +1,68 @@
+---
+title: Accessibility
+description: How audiocn components for GPUI work with keyboards, assistive technology and reduced motion.
+seoDescription: Keyboard control, AccessKit roles and labels, and reduced motion in audiocn's GPUI components, and where the Rust port still differs from the React ARIA support.
+---
+
+GPUI exposes an accessibility tree to screen readers through [AccessKit](https://accesskit.dev). The port sets roles, labels and values where the React components set ARIA attributes, but not everywhere yet: this page says which. Keyboard support is complete.
+
+## Meters
+
+- `LevelMeter` has the meter role and reports its value in dB, such as "−12.0 dB", with its range. The value updates at most four times a second, so screen readers are not flooded.
+- Give every meter a name with `.aria_label(..)`.
+- `BarVisualizer`, `Spectrum` and the track list's playing indicator have the image role. Mark a decorative bar visualizer `.aria_hidden(true)` when a labelled meter sits next to it.
+- `ElectricWaveform`, `ElectricBarVisualizer` and `Waveform` take `.aria_label(..)` but don't expose it yet. `LiveWaveform` and `SmoothWaveform` have no role.
+- `ClipIndicator` is a button that resets the clip. GPUI has no live regions, so it does not announce "Clipping".
+
+## Controls
+
+`Fader`, `ParameterSlider`, `VolumeControl` and the player's seek bar have the slider role. The fader, parameter slider and volume control report a readable value, such as "−6.0 dB" or "Silent". `Knob`, `PanControl` and `Waveform` have no role yet, though they format the same values for their readouts ("30% left", "1:24"). They all share one keyboard map:
+
+| Key                                | Action            |
+| ---------------------------------- | ----------------- |
+| Arrow keys                         | One step          |
+| Shift + arrow, Page Up / Page Down | A large step      |
+| Alt + arrow                        | A fine step       |
+| Home / End                         | Minimum / maximum |
+
+Double-clicking resets a fader, knob or pan control; `FaderReset` and `ParameterSliderReset` give the same action a keyboard path.
+
+Mute, solo and monitor toggles, sound pads and the player's toggle buttons are buttons with a pressed state.
+
+GPUI doesn't bind Tab to move focus on its own. Bind it in your app, as the gallery does, so people can reach every control:
+
+```rust
+actions!(app, [FocusNext, FocusPrev]);
+
+cx.bind_keys([
+    KeyBinding::new("tab", FocusNext, None),
+    KeyBinding::new("shift-tab", FocusPrev, None),
+]);
+
+// on your root element:
+div()
+    .on_action(|_: &FocusNext, window, cx| window.focus_next(cx))
+    .on_action(|_: &FocusPrev, window, cx| window.focus_prev(cx))
+```
+
+## Mixers and lists
+
+- Strips sit inside `MixerChannels`. Ctrl + arrow keys (Cmd on macOS) move focus to the same control on the next strip; Tab still reaches everything in order. Strips have no group role yet.
+- Track lists and sound pad grids move focus with the arrow keys. Track lists have the list role.
+- Sound pad hotkeys never fire while someone is typing in a field. Pads don't report their hotkey to assistive technology yet, so show it on the pad.
+
+## Colour is never the only signal
+
+Muted, soloed and clipping states also show as pressed toggles, labels or shapes. Zone colours sit on top of a level you can read without them.
+
+## Reduced motion
+
+GPUI has no `prefers-reduced-motion` query, so your app sets the preference, from the system setting or its own:
+
+```rust
+use audiocn::signal::reduced_motion::set_reduced_motion;
+
+set_reduced_motion(true, cx);
+```
+
+With it set, meters and visualizers stop animating and show the current level four times a second. Idle animations and sweeps turn off. See [`prefers_reduced_motion`](/docs/gpui/hooks/use-reduced-motion).

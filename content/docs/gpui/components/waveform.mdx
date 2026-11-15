@@ -1,0 +1,203 @@
+---
+title: Waveform
+description: A static waveform of a clip with a smooth playhead, seeking, hover time, regions and markers, painted by GPUI.
+seoDescription: A static audio waveform for GPUI apps in Rust, with a smooth playhead, click and keyboard seeking, hover time, regions and markers. The audiocn Waveform for Zed's UI framework.
+---
+
+<GpuiExample demo="waveform" eager />
+
+## Installation
+
+```bash
+cargo add audiocn
+```
+
+Decoding files and playing them back is native audio I/O, behind the `device` feature:
+
+```bash
+cargo add audiocn --features device
+```
+
+## Usage
+
+```rust
+use audiocn::Waveform;
+```
+
+```rust
+use audiocn::io::{AudioBuffer, use_audio_player};
+use audiocn::signal::waveform_data::{DEFAULT_PEAK_COUNT, waveform_data_from_samples};
+use audiocn::{AudioPlayerController, UseAudioPlayerOptions, Waveform};
+
+let src = "assets/track.mp3";
+
+// Once, when the clip loads: decode it and reduce it to peaks.
+let buffer = AudioBuffer::load_cached(src)?;
+let data = waveform_data_from_samples(
+    buffer.channels(),
+    buffer.sample_rate() as f32,
+    DEFAULT_PEAK_COUNT,
+);
+
+// In render:
+let player = use_audio_player(
+    "player",
+    UseAudioPlayerOptions { src: Some(src.into()), ..Default::default() },
+    window,
+    cx,
+);
+let seek = player.clone();
+
+Waveform::new("track")
+    .peaks_option(data.peaks.map(Into::into))
+    .duration(data.duration)
+    .time(player.time(cx))
+    .on_seek_committed(move |seconds, window, cx| seek.seek(seconds, window, cx))
+```
+
+Pass `.time(..)` (a `FrameSource<f64>`) for a playhead that moves every frame without re-rendering your view, or `.current_time(..)` for plain controlled use. `Waveform::new` takes an element id, which keeps the playhead, hover and focus between renders. Peaks are `0..1`; `compute_peaks` reduces any decoded channels without the `device` feature.
+
+## Anatomy
+
+```rust
+use audiocn::{
+    Waveform, WaveformCanvas, WaveformCursor, WaveformHover, WaveformMarker, WaveformRegion,
+};
+
+Waveform::new("track")
+    .child(WaveformCanvas::new())
+    .child(WaveformCursor::new())
+    .child(WaveformHover::new())
+    .child(WaveformRegion::new("loop", 9., 22.))
+    .child(WaveformMarker::new(40.).child("Intro ends"))
+```
+
+A waveform with no children shows a `WaveformCanvas` and a `WaveformCursor`. The parts read the root's peaks, time and colours, like the React context.
+
+## Examples
+
+### Variants
+
+<GpuiExample demo="waveform" variant="variants" />
+
+### Regions and markers
+
+<GpuiExample demo="waveform" variant="regions" />
+
+## Theming
+
+The waveform paints with the active `audiocn::Theme`. The React CSS variables are builder options here:
+
+| React | GPUI |
+| --- | --- |
+| `--waveform` | `.color(color)`, default `Theme::muted_foreground` |
+| `--waveform-progress` | `.progress_color(color)`, default `Theme::primary` |
+| `--waveform-cursor` | `.cursor_color(color)`, default `Theme::foreground` |
+| `--waveform-position` | No equivalent: the parts read the position from the root |
+| `data-loading`, `data-dragging`, `data-disabled` | No equivalent: `.loading(..)` and `.disabled(..)` are what you passed; disabled draws at 50% |
+
+`WaveformMarker` draws in `Theme::meter_warn`.
+
+## Accessibility
+
+When interactive, the waveform is focusable. Arrow keys seek by `step`, Shift by `large_step`, and Home and End jump to the ends. Region edges are separate focus stops: arrow keys move an edge by 0.1 s, or 1 s with Shift.
+
+GPUI has no accessibility tree for this element yet, so there is no slider role or value text such as "1:24 of 3:40". `.aria_label(..)` is accepted for parity but not exposed.
+
+## API reference
+
+### Waveform
+
+<PropsTable
+  rows={[
+    [
+      "new",
+      "(id: impl Into<ElementId>)",
+      null,
+      "Keeps playhead, hover and focus between renders.",
+    ],
+    [
+      "peaks",
+      "impl Into<Arc<[f32]>>",
+      null,
+      "0..1, from compute_peaks or waveform_data_from_samples.",
+    ],
+    [
+      "peaks_option",
+      "Option<Arc<[f32]>>",
+      null,
+      "Peaks that may not be there yet.",
+    ],
+    ["duration", "f64", "0.", "Seconds."],
+    ["current_time", "f64", null, "Controlled playhead in seconds."],
+    ["default_current_time", "f64", "0.", null],
+    ["time", "FrameSource<f64>", null, "A smooth playhead with no renders."],
+    ["on_seek", "Fn(f64, &mut Window, &mut App)", null, "While seeking."],
+    [
+      "on_seek_committed",
+      "Fn(f64, &mut Window, &mut App)",
+      null,
+      "On release or after keyboard seeking.",
+    ],
+    ["step / large_step", "f64", "5. / 15.", "Seconds for the keyboard."],
+    ["variant", "WaveformVariant", "Bars", "Bars, Line or Mirror."],
+    ["bar_width / bar_gap / bar_radius", "f32", "2. / 1. / 1.", "Pixels."],
+    ["interactive", "bool", "true", "false is display only."],
+    ["loading", "bool", "false", "Shows a skeleton."],
+    ["disabled", "bool", "false", null],
+    [
+      "color / progress_color / cursor_color",
+      "impl Into<Hsla>",
+      null,
+      "See Theming.",
+    ],
+    [
+      "aria_label",
+      "impl Into<SharedString>",
+      null,
+      "Kept for parity; not exposed yet.",
+    ],
+    ["child / children", "Waveform parts or any element", null, null],
+  ]}
+/>
+
+### WaveformRegion
+
+<PropsTable
+  rows={[
+    [
+      "new",
+      "(id: impl Into<ElementId>, start: f64, end: f64)",
+      null,
+      "Seconds.",
+    ],
+    [
+      "on_value_change",
+      "Fn(WaveformRegionValue, &mut Window, &mut App)",
+      null,
+      "{ start, end }.",
+    ],
+    ["resizable", "bool", "true", "Drag the edges."],
+    ["draggable", "bool", "true", "Drag the whole region."],
+    ["min_length", "f64", "0.1", "Seconds."],
+  ]}
+/>
+
+### WaveformMarker
+
+<PropsTable
+  rows={[["new", "(time: f64)", null, "Seconds. Children become the label."]]}
+/>
+
+### WaveformHover
+
+<PropsTable
+  rows={[
+    [
+      "format",
+      "Fn(f64) -> String",
+      "format_time (m:ss)",
+      "Formats the hovered time.",
+    ],
+  ]}
+/>

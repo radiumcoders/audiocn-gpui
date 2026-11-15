@@ -1,0 +1,137 @@
+---
+title: Installation
+description: Add the audiocn crate to a GPUI app with Cargo, initialise it and set a theme.
+seoDescription: Install audiocn for GPUI with cargo add audiocn. Set up gpui-pre, register the key bindings, pick a shadcn theme and turn on native audio with the device feature.
+---
+
+audiocn for GPUI is a Rust crate. You add it with Cargo, and every component, block and helper comes with it.
+
+## Requirements
+
+- A current stable Rust. The crate uses edition 2024, and GPUI uses recently stabilised standard library APIs.
+- GPUI as published on crates.io: `gpui-pre` 0.3.9, the published snapshot of Zed's GPUI. Import it under the name `gpui`.
+- On Linux, GPUI's display backends are off by default. Turn on the `wayland` and `x11` features of `gpui-pre-platform`.
+
+<Steps>
+
+<Step>
+
+### Add GPUI
+
+Skip this if your app already runs on GPUI.
+
+```toml title="Cargo.toml"
+[dependencies]
+gpui = { package = "gpui-pre", version = "0.3.9" }
+gpui_platform = { package = "gpui-pre-platform", version = "=0.3.9", features = ["wayland", "x11"] }
+```
+
+</Step>
+
+<Step>
+
+### Add audiocn
+
+```bash
+cargo add audiocn
+```
+
+For native audio (microphones, system audio, devices, playback and the mixer engine), turn on the `device` feature:
+
+```bash
+cargo add audiocn --features device
+```
+
+</Step>
+
+<Step>
+
+### Initialise it
+
+Call `audiocn::init(cx)` once at startup. It registers the key bindings the text inputs and value editors use. Then set a theme:
+
+```rust title="src/main.rs"
+use audiocn::theme::{Theme, set_theme};
+use gpui::{App, AppContext, WindowOptions};
+
+fn main() {
+    gpui_platform::application().run(|cx: &mut App| {
+        audiocn::init(cx);
+        set_theme(Theme::dark(), cx);
+
+        cx.open_window(WindowOptions::default(), |_, cx| cx.new(|_| MicLevel { peak_db: -12. }))
+            .unwrap();
+    });
+}
+```
+
+Without a theme, components use `Theme::light()`. See [Theming](/docs/gpui/concepts/theming) to use any shadcn theme.
+
+</Step>
+
+<Step>
+
+### Use it
+
+```rust
+use audiocn::LevelMeter;
+use gpui::{Context, IntoElement, Render, Window};
+
+struct MicLevel {
+    peak_db: f32,
+}
+
+impl Render for MicLevel {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        LevelMeter::new("mic").aria_label("Microphone level").peak_db(self.peak_db)
+    }
+}
+```
+
+</Step>
+
+</Steps>
+
+## What gets installed
+
+| Module | What it is |
+| --- | --- |
+| `audiocn::*` | The components and blocks, re-exported at the root: `LevelMeter`, `Fader`, `Knob`, `Mixer`, `SystemAudioMixer`… |
+| `audiocn::signal` | The hooks that hold no audio: demo signal, mixer state, clip hold, tap tempo, level sampling, waveform peaks, reduced motion |
+| `audiocn::audio` | The audio core: decibels, ballistics, tapers, zones, bands, frame sources, types |
+| `audiocn::theme` | `Theme`, with shadcn's tokens and the audio tokens, and `set_theme` |
+| `audiocn::ui` | The shadcn/ui primitives the components use: Button, Select, Popover, Tabs, Switch, Tooltip… |
+| `audiocn::io` | Native audio, with the `device` feature: microphone, system audio, devices, player, sounds, gain and a mixer engine |
+
+## For AI agents
+
+Every GPUI page has a **Copy page** button. It copies the page as Markdown: the install steps, the usage, every example with its Rust and the full API.
+
+The same document is served at the page URL with `.md` appended, so an agent can fetch it directly:
+
+```bash
+curl https://audiocn.dev/docs/gpui/components/bar-visualizer.md
+```
+
+## Platforms
+
+- **Linux, macOS and Windows** run everything. On Linux, `audiocn::io` speaks PulseAudio, which PipeWire serves through `pipewire-pulse`, and falls back to ALSA.
+- **The web.** The crate builds for `wasm32-unknown-unknown` and runs on GPUI's web platform. The `device` feature is native only, so `audiocn::io` is not available there.
+- Without the `device` feature, nothing opens a device. Components take levels, frames and callbacks from your own engine. See [Using your own audio engine](/docs/gpui/concepts/custom-engine).
+
+## Install everything
+
+There is nothing more to install: the crate has every component and block. To see them all, run the gallery from the [repository](https://github.com/audiocn/ui). It renders every page and every example of these docs, in the same order:
+
+```bash
+cargo run -p audiocn-gallery                                # every page, with a sidebar
+cargo run -p audiocn-gallery -- --demo knob --theme dark    # one page
+cargo run -p audiocn-gallery -- --demo knob --variant metal # one example
+cargo run -p audiocn-gallery --features device              # a real microphone in the examples
+```
+
+`--playground` opens a test bench for every component and block: a control for every option, a signal source picker, the theme presets, reduced motion, an event log and the Rust for the current settings.
+
+```bash
+cargo run -p audiocn-gallery --features device -- --playground level-meter
+```

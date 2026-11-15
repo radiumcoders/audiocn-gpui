@@ -1,0 +1,104 @@
+---
+title: Track List
+description: A list of tracks with active and playing states and arrow-key navigation, for GPUI.
+seoDescription: A track list for GPUI apps in Rust, with active and playing states, an animated equaliser, row actions and arrow-key navigation. The audiocn Track List for Zed's UI framework.
+---
+
+<GpuiExample demo="track-list" eager />
+
+## Installation
+
+```bash
+cargo add audiocn
+```
+
+## Usage
+
+```rust
+use audiocn::{
+    TrackList, TrackListItem, TrackListItemContent, TrackListItemIndex, TrackListItemTitle,
+};
+```
+
+```rust
+let view = cx.entity();
+TrackList::new("queue").children(tracks.iter().enumerate().map(|(index, track)| {
+    let (view, id) = (view.clone(), track.id.clone());
+    TrackListItem::new(track.id.clone())
+        .active(track.id == current)
+        .playing(track.id == current && playing)
+        .on_select(move |_, cx| view.update(cx, |this, cx| this.play(&id, cx)))
+        .child(TrackListItemIndex::new().child((index + 1).to_string()))
+        .child(
+            TrackListItemContent::new()
+                .child(TrackListItemTitle::new().child(track.title.clone())),
+        )
+}))
+```
+
+`TrackList::new` and `TrackListItem::new` take element ids. A row keeps its focus under its id, so give each row an id that is unique in the list, like the track's id. `TrackListItemIndex` shows its children, or a small animated equaliser while the item is playing.
+
+## Anatomy
+
+```rust
+TrackList::new("queue").child(
+    TrackListItem::new("night-drive")
+        .child(TrackListItemIndex::new())
+        .child(TrackListItemArtwork::new(cover))
+        .child(
+            TrackListItemContent::new()
+                .child(TrackListItemTitle::new())
+                .child(TrackListItemDescription::new()),
+        )
+        .child(TrackListItemDuration::new())
+        .child(TrackListItemActions::new()),
+)
+```
+
+## Accessibility
+
+- Up and Down move between items; Home and End jump; Enter or Space selects.
+- The list and its rows have the list and list item roles. GPUI has no `aria-current`; the current row is shown by its background and a primary title.
+- Buttons inside `TrackListItemActions` stay reachable with Tab and do not select the item.
+
+Reordering is a recipe with GPUI's drag and drop (`on_drag` and `on_drop`), not built in.
+
+## API reference
+
+### TrackList
+
+<PropsTable
+  rows={[
+    ["new", "(id: impl Into<ElementId>)", null, null],
+    [
+      "size",
+      "TrackListSize",
+      "Default",
+      "Row height: Sm 36px, Default 48px, Lg 56px.",
+    ],
+    ["variant", "TrackListVariant", "Default", "Default or Outline."],
+  ]}
+/>
+
+### TrackListItem
+
+<PropsTable
+  rows={[
+    [
+      "new",
+      "(id: impl Into<ElementId>)",
+      null,
+      "Keeps the row's focus between renders.",
+    ],
+    ["active", "bool", "false", "The current track."],
+    ["playing", "bool", "false", "The current track, playing."],
+    ["disabled", "bool", "false", null],
+    ["on_select", "Fn(&mut Window, &mut App)", null, "Click, Enter or Space."],
+    [
+      "child / children",
+      "Track list parts or any element",
+      null,
+      "The row is a flex row and takes GPUI's style methods, in place of React's render prop.",
+    ],
+  ]}
+/>

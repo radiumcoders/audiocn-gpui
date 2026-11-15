@@ -124,17 +124,7 @@ impl Playground {
     }
 
     fn apply_theme(&self, dark: bool, cx: &mut App) {
-        let mut theme = if dark { Theme::dark() } else { Theme::light() };
-        let preset = THEME_PRESETS[self.preset];
-        if preset != "stone" {
-            if let Some(block) = css_block(&format!("[data-theme=\"{preset}\"]")) {
-                theme.apply_css(block);
-            }
-            if dark && let Some(block) = css_block(&format!(".dark[data-theme=\"{preset}\"]")) {
-                theme.apply_css(block);
-            }
-        }
-        audiocn::theme::set_theme(theme, cx);
+        audiocn::theme::set_theme(site_theme(THEME_PRESETS[self.preset], dark), cx);
     }
 
     // ----- layout -------------------------------------------------------
@@ -744,6 +734,21 @@ fn capitalize(s: &str) -> String {
     c.next()
         .map(|f| f.to_uppercase().collect::<String>() + c.as_str())
         .unwrap_or_default()
+}
+
+/// audiocn.dev's theme `preset` (stone, ocean, rose, forest, violet, mono), read from
+/// globals.css, in light or dark. Unknown presets fall back to stone.
+pub fn site_theme(preset: &str, dark: bool) -> Theme {
+    let mut theme = if dark { Theme::dark() } else { Theme::light() };
+    if preset != "stone" {
+        if let Some(block) = css_block(&format!("[data-theme=\"{preset}\"]")) {
+            theme.apply_css(block);
+        }
+        if dark && let Some(block) = css_block(&format!(".dark[data-theme=\"{preset}\"]")) {
+            theme.apply_css(block);
+        }
+    }
+    theme
 }
 
 /// Finds `selector { ... }` in audiocn's globals.css and returns the body.

@@ -1,0 +1,73 @@
+---
+title: waveform_data_from_samples
+description: Reduce decoded audio to waveform peaks for the Waveform component.
+seoDescription: waveform_data_from_samples and compute_peaks reduce decoded audio to normalised waveform peaks in Rust for audiocn's GPUI Waveform, with AudioBuffer decoding behind the device feature.
+---
+
+```bash
+cargo add audiocn --features device
+```
+
+## Usage
+
+React's `useWaveformData` fetches, decodes and reduces a file in one hook. In Rust the reduction is a plain function, and decoding is `AudioBuffer` behind the `device` feature. Run both on a background task:
+
+```rust
+use audiocn::io::AudioBuffer;
+use audiocn::signal::waveform_data::{WaveformData, WaveformDataStatus, waveform_data_from_samples};
+
+// When the view is created:
+self.waveform = WaveformData::loading();
+cx.spawn(async move |this, cx| {
+    let data = cx
+        .background_executor()
+        .spawn(async {
+            match AudioBuffer::load_cached("/audio/episode.mp3") {
+                Ok(buffer) => waveform_data_from_samples(buffer.channels(), buffer.sample_rate() as f32, 800),
+                Err(error) => WaveformData::error(error.to_string()),
+            }
+        })
+        .await;
+    this.update(cx, |this, cx| {
+        this.waveform = data;
+        cx.notify();
+    })
+})
+.detach();
+
+// In render:
+Waveform::new("episode")
+    .loading(self.waveform.status == WaveformDataStatus::Loading)
+    .peaks_option(self.waveform.peaks.clone().map(Into::into))
+    .duration(self.waveform.duration)
+```
+
+Peaks are the loudest sample in each slice, across all channels, normalised so the loudest slice is 1. `AudioBuffer::load_cached` decodes each file once; cache the peaks yourself if you compute them more than once.
+
+## Options
+
+<PropsTable
+  rows={[
+    [
+      "samples",
+      "usize",
+      null,
+      "How many peaks to compute. React's default is DEFAULT_PEAK_COUNT, 512.",
+    ],
+  ]}
+/>
+
+## Returns
+
+`WaveformData`:
+
+<PropsTable
+  rows={[
+    ["peaks", "Option<Vec<f32>>", null, "0..1 per slice."],
+    ["duration", "f64", null, "Seconds."],
+    ["status", "WaveformDataStatus", null, "Idle, Loading, Ready or Error."],
+    ["error", "Option<SharedString>", null, null],
+  ]}
+/>
+
+`compute_peaks(channels, samples)` returns only the peaks, from any decoded samples, with or without the `device` feature.
