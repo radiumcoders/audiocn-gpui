@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import type { MouseEvent } from "react";
 
 import { GPUI_BASE, frameworkOf, twinPath } from "@/lib/docs/framework";
 import type { Framework } from "@/lib/docs/framework";
@@ -19,6 +20,7 @@ const FRAMEWORKS: { label: string; title: string; value: Framework }[] = [
  */
 export const FrameworkSwitch = ({ urls }: { urls: string[] }) => {
   const pathname = usePathname();
+  const router = useRouter();
   const current = frameworkOf(pathname);
   const known = new Set(urls);
 
@@ -28,6 +30,16 @@ export const FrameworkSwitch = ({ urls }: { urls: string[] }) => {
       return twin;
     }
     return target === "gpui" ? GPUI_BASE : "/docs";
+  };
+
+  // Both frameworks' pages have the same headings, so keep the section too.
+  const keepSection = (event: MouseEvent<HTMLAnchorElement>, href: string) => {
+    const { hash } = window.location;
+    if (!hash || href !== twinPath(pathname, frameworkOf(href))) {
+      return;
+    }
+    event.preventDefault();
+    router.push(`${href}${hash}`);
   };
 
   return (
@@ -53,6 +65,7 @@ export const FrameworkSwitch = ({ urls }: { urls: string[] }) => {
             )}
             href={hrefFor(framework.value)}
             key={framework.value}
+            onClick={(event) => keepSection(event, hrefFor(framework.value))}
             title={framework.title}
           >
             {framework.label}

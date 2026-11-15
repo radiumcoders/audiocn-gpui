@@ -1,11 +1,14 @@
 import { DocsLayout } from "fumadocs-ui/layouts/docs";
 
 import { FrameworkSwitch } from "@/components/docs/framework-switch";
-import { pageUrls, splitFrameworks } from "@/lib/docs/framework";
+import { pageUrls } from "@/lib/docs/framework";
 import { baseOptions } from "@/lib/layout.shared";
 import { source } from "@/lib/source";
 
-const tree = splitFrameworks(source.getPageTree());
+// The GPUI docs aren't listed in the root meta.json, so they sit in the
+// tree's fallback and the sidebar shows one framework at a time: the GPUI
+// folder is a root folder, shown alone on its pages.
+const tree = source.getPageTree();
 
 const Layout = ({ children }: { children: React.ReactNode }) => (
   <DocsLayout
