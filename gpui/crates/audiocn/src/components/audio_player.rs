@@ -1851,11 +1851,12 @@ pub fn next_rate(rates: &[f32], current: f32) -> f32 {
     rates.get(next).copied().unwrap_or(1.0)
 }
 
-/// The width of `0` in `family` at `size` (CSS `ch`).
+/// The width of `0` in `family` at `size` (CSS `ch`): its advance, not its
+/// ink box, which is narrower on the web and macOS.
 pub(crate) fn ch_width(family: SharedString, size: Pixels, window: &Window) -> Pixels {
     let text = window.text_system();
     let font_id = text.resolve_font(&gpui::font(family));
-    text.ch_width(font_id, size).unwrap_or(size * 0.6)
+    text.ch_advance(font_id, size).unwrap_or(size * 0.6)
 }
 
 impl RenderOnce for AudioPlayerRate {

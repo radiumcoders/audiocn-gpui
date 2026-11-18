@@ -1263,7 +1263,9 @@ impl ChannelStripValue {
         let font_id = window.text_system().resolve_font(&font(mono.clone()));
         let ch = window
             .text_system()
-            .ch_width(font_id, size)
+            // The advance of `0` (CSS `ch`), not `ch_width`'s ink box, which is
+            // narrower on the web and macOS and would let the readout resize.
+            .ch_advance(font_id, size)
             .unwrap_or(px(7.2));
         let vertical = strip_orientation() == Orientation::Vertical;
         let mut el = div()

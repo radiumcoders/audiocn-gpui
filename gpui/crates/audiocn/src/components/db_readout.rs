@@ -466,7 +466,10 @@ impl RenderOnce for DbReadout {
         let font_id = window.text_system().resolve_font(&text_style.font());
         let ch = window
             .text_system()
-            .ch_width(font_id, font_size)
+            // CSS `ch` is the advance of `0`. `ch_width` is its ink box on the
+            // web and macOS, narrower than the text, so the readout would grow
+            // with wide values and shift the meter beside it.
+            .ch_advance(font_id, font_size)
             // Unrounded, like the text advances GPUI lays out: Chrome on Linux
             // rounds both (8ch of 14px Geist Mono is 64px there, 67.2px here).
             .unwrap_or(font_size * 0.6);
